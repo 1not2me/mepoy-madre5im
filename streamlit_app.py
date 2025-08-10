@@ -1,72 +1,47 @@
 import streamlit as st
 import pandas as pd
-from github import Github
-from datetime import datetime
-import io
+import base64
+import requests
+import os
 
-# ------------------------------
-# הגדרות GitHub
-# ------------------------------
-GITHUB_TOKEN = "הכניסי_כאן_את_הטוקן_שלך"
-REPO_NAME = "1not2me/mepoy-madre5im"
-CSV_FILE = "mapping_data.csv"
+# ה־token מאוחסן ב־secret
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+REPO_OWNER = "1not2me"
+REPO_NAME = "mepoy-madre5im"
+FILE_PATH = "mapping_data.csv"
 
-# ------------------------------
-# התחברות ל-GitHub
-# ------------------------------
-g = Github(GITHUB_TOKEN)
-repo = g.get_repo(REPO_NAME)
+def update_github_csv(new_data):
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
 
-# ------------------------------
-# פונקציה לקריאת הנתונים הקיימים
-# ------------------------------
-def load_csv_from_github():
-    try:
-        file_content = repo.get_contents(CSV_FILE)
-        df = pd.read_csv(io.BytesIO(file_content.decoded_content))
-        return df
-    except:
-        return pd.DataFrame(columns=["שם מלא", "שם משפחה", "שם פרטי", "מוסד/שירות", "תחום התמחות", "רחוב", "עיר", "תאריך"])
+    # קריאת הקובץ הקיים
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        content = base64.b64decode(r.json()["content"]).decode()
+        df = pd.read_csv(pd.compat.StringIO(content))
+        df = pd.concat([df, new_data], ignore_index=True)
+    else:
+        df = new_data
 
-# ------------------------------
-# פונקציה לשמירת הנתונים
-# ------------------------------
-def save_csv_to_github(df):
-    csv_bytes = df.to_csv(index=False).encode()
-    try:
-        file = repo.get_contents(CSV_FILE)
-        repo.update_file(CSV_FILE, "עדכון נתונים", csv_bytes, file.sha)
-    except:
-        repo.create_file(CSV_FILE, "קובץ חדש עם נתונים", csv_bytes)
+    # שמירת הקובץ חזרה ל־GitHub
+    content_bytes = df.to_csv(index=False).encode()
+    content_b64 = base64.b64encode(content_bytes).decode()
 
-# ------------------------------
-# טופס הקליטה
-# ------------------------------
-st.title("📝 מיפוי מדריכים לשיבוץ סטודנטים - שנת הכשרה")
-
-with st.form("form"):
-    full_name = st.text_input("שם מלא של המדריך/ה")
-    last_name = st.text_input("שם משפחה")
-    first_name = st.text_input("שם פרטי")
-    institution = st.text_input("מוסד / שירות ההכשרה")
-    field = st.selectbox("תחום התמחות", ["חינוך", "בריאות", "חברתי", "אחר"])
-    street = st.text_input("רחוב")
-    city = st.text_input("עיר")
-
-    submitted = st.form_submit_button("שלח")
-
-if submitted:
-    df = load_csv_from_github()
-    new_row = {
-        "שם מלא": full_name,
-        "שם משפחה": last_name,
-        "שם פרטי": first_name,
-        "מוסד/שירות": institution,
-        "תחום התמחות": field,
-        "רחוב": street,
-        "עיר": city,
-        "תאריך": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    data = {
+        "message": "עדכון נתונים מהטופס",
+        "content": content_b64,
+        "sha": r.json().get("sha") if r.status_code == 200 else None
     }
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    save_csv_to_github(df)
-    st.success("✅ הנתונים נשמרו בהצלחה ב־GitHub שלך!")
+    requests.put(url, headers=headers, json=data)
+
+# טופס פשוט לדוגמה
+st.title("📋 טופס לדוגמה")
+name = st.text_input("שם")
+email = st.text_input("אימייל")
+if st.button("שמור"):
+    if name and email:
+        df_new = pd.DataFrame([{"שם": name, "אימייל": email}])
+        update_github_csv(df_new)
+        st.success("✅ הנתונים נשמרו ב־GitHub!")
+    else:
+        st.error("❌ יש למלא את כל השדות")
