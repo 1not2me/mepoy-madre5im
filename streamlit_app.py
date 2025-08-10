@@ -1,98 +1,90 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import re
 
-st.set_page_config(page_title="מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו", layout="centered")
-
-# כותרת והסבר
-st.title("📋 מיפוי מדריכים לשיבוץ סטודנטים - שנת הכשרה תשפ\"ו")
+# כותרת הדף
+st.title("📋 טופס מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו")
 st.write("""
-שלום רב, מטרת טופס זה היא לאסוף מידע עדכני על מדריכים ומוסדות הכשרה לקראת שיבוץ הסטודנטים לשנת ההכשרה הקרובה.  
+שלום רב, מטרת טופס זה היא לאסוף מידע עדכני על מדריכים ומוסדות הכשרה לקראת שיבוץ הסטודנטים לשנת ההכשרה הקרובה.
 אנא מלא/י את כל השדות בצורה מדויקת. המידע ישמש לצורך תכנון השיבוץ בלבד.
 """)
 
+# יצירת טופס
 with st.form("mapping_form"):
     st.subheader("פרטים אישיים")
-    last_name = st.text_input(":שם משפחה *")
-    first_name = st.text_input(":שם פרטי *")
-
-    st.subheader("מוסד והכשרה")
-    institution = st.text_input(":מוסד / שירות ההכשרה *")
-    specialization = st.selectbox(":תחום ההתמחות *", ["Please Select", "חינוך", "בריאות", "רווחה", "אחר"])
-    specialization_other = ""
-    if specialization == "אחר":
-        specialization_other = st.text_input(":אם ציינת אחר, אנא כתוב את תחום ההתמחות *")
+    full_name = st.text_input("שם מלא של המדריך/ה")
+    first_name = st.text_input("שם פרטי")
+    last_name = st.text_input("שם משפחה")
+    training_institution = st.text_input("מוסד / שירות ההכשרה")
+    specialty = st.selectbox("תחום ההתמחות", ["Please Select", "תחום א", "תחום ב", "תחום ג", "אחר"])
+    other_specialty = ""
+    if specialty == "אחר":
+        other_specialty = st.text_input("אם ציינת אחר, אנא כתוב את תחום ההתמחות")
 
     st.subheader("כתובת מקום ההכשרה")
-    street = st.text_input(":רחוב *")
-    city = st.text_input("עיר *")
-    postal_code = st.text_input(":מיקוד *")
+    street = st.text_input("רחוב")
+    city = st.text_input("עיר")
+    postal_code = st.text_input("מיקוד")
 
-    st.subheader("קליטת סטודנטים")
-    num_students = st.number_input(":מספר סטודנטים שניתן לקלוט השנה *", min_value=0, step=1)
-    continue_mentoring = st.radio("?האם מעוניין/ת להמשיך להדריך השנה *", ["כן", "לא"])
+    students_count = st.number_input("מספר סטודנטים שניתן לקלוט השנה", min_value=0, step=1)
+    continue_training = st.radio("האם מעוניין/ת להמשיך להדריך השנה?", ["כן", "לא"])
+    phone = st.text_input("טלפון")
+    email = st.text_input("כתובת אימייל")
+    
+    # הערות נוספות
+    notes = st.text_area("הערות")
 
-    st.subheader("פרטי התקשרות")
-    phone = st.text_input(":טלפון * (לדוגמה: 050-1234567)")
-    email = st.text_input(":כתובת אימייל *")
+    submit_btn = st.form_submit_button("שלח")
 
-    submit_btn = st.form_submit_button("שלח/י")
-
+# שמירת הנתונים אם נשלח
 if submit_btn:
-    errors = []
+    data = {
+        "תאריך": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+        "שם מלא": [full_name],
+        "שם פרטי": [first_name],
+        "שם משפחה": [last_name],
+        "מוסד / שירות ההכשרה": [training_institution],
+        "תחום התמחות": [specialty if specialty != "אחר" else other_specialty],
+        "רחוב": [street],
+        "עיר": [city],
+        "מיקוד": [postal_code],
+        "מספר סטודנטים": [students_count],
+        "ממשיך הדרכה": [continue_training],
+        "טלפון": [phone],
+        "אימייל": [email],
+        "הערות": [notes]
+    }
 
-    # בדיקות חובה
-    if not last_name.strip():
-        errors.append("יש למלא שם משפחה")
-    if not first_name.strip():
-        errors.append("יש למלא שם פרטי")
-    if not institution.strip():
-        errors.append("יש למלא מוסד/שירות ההכשרה")
-    if specialization == "Please Select":
-        errors.append("יש לבחור תחום התמחות")
-    if specialization == "אחר" and not specialization_other.strip():
-        errors.append("יש למלא את תחום ההתמחות")
-    if not street.strip():
-        errors.append("יש למלא רחוב")
-    if not city.strip():
-        errors.append("יש למלא עיר")
-    if not postal_code.strip():
-        errors.append("יש למלא מיקוד")
-    if num_students <= 0:
-        errors.append("יש להזין מספר סטודנטים גדול מ-0")
-    if not re.match(r"^0\d{1,2}-\d{6,7}$", phone.strip()):
-        errors.append("מספר הטלפון אינו תקין")
-    if not re.match(r"[^@]+@[^@]+\.[^@]+", email.strip()):
-        errors.append("כתובת האימייל אינה תקינה")
+    df = pd.DataFrame(data)
 
-    if errors:
-        for e in errors:
-            st.error(e)
-    else:
-        data = {
-            "תאריך": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-            "שם משפחה": [last_name],
-            "שם פרטי": [first_name],
-            "מוסד/שירות ההכשרה": [institution],
-            "תחום התמחות": [specialization_other if specialization == "אחר" else specialization],
-            "רחוב": [street],
-            "עיר": [city],
-            "מיקוד": [postal_code],
-            "מספר סטודנטים": [num_students],
-            "המשך הדרכה": [continue_mentoring],
-            "טלפון": [phone],
-            "אימייל": [email]
-        }
+    try:
+        existing_df = pd.read_csv("mapping_data.csv")
+        updated_df = pd.concat([existing_df, df], ignore_index=True)
+        updated_df.to_csv("mapping_data.csv", index=False)
+    except FileNotFoundError:
+        df.to_csv("mapping_data.csv", index=False)
 
-        df = pd.DataFrame(data)
+    st.success("✅ הנתונים נשמרו בהצלחה!")
+    st.dataframe(df)
 
-        try:
-            existing_df = pd.read_csv("mapping_data.csv")
-            updated_df = pd.concat([existing_df, df], ignore_index=True)
-            updated_df.to_csv("mapping_data.csv", index=False)
-        except FileNotFoundError:
-            df.to_csv("mapping_data.csv", index=False)
+# הצגת כל הנתונים (גישה מוגבלת עם סיסמה)
+st.subheader("🔒 גישה למנהלים בלבד")
+password = st.text_input("הכנס סיסמה כדי לצפות בכל התשובות", type="password")
+if password == "Rawan2025":  # ← שנה לסיסמה שאת בוחרת
+    try:
+        all_data = pd.read_csv("mapping_data.csv")
+        st.write("📄 כל התשובות שנשמרו:")
+        st.dataframe(all_data)
 
-        st.success("✅ הנתונים נשמרו בהצלחה!")
-        st.dataframe(df)
+        # כפתור להורדת הקובץ
+        csv = all_data.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 הורד את כל התשובות כ-CSV",
+            data=csv,
+            file_name="mapping_data.csv",
+            mime="text/csv"
+        )
+    except FileNotFoundError:
+        st.warning("אין עדיין תשובות שמורות.")
+elif password != "":
+    st.error("❌ סיסמה שגויה")
