@@ -56,21 +56,4 @@ if submit_btn:
 
     st.success("✅ הנתונים נשמרו בהצלחה!")
 
-# --- גישה למנהלת בלבד ---
-st.markdown("---")
-password = st.text_input("הכנסי סיסמה כדי לצפות בתשובות", type="password")
-if password == "rawan123":  # סיסמה שאת מגדירה
-    if os.path.exists("mapping_data.csv"):
-        df = pd.read_csv("mapping_data.csv")
-        st.subheader("📄 כל התשובות שנשמרו")
-        st.dataframe(df)
 
-        # כפתור להורדת הקובץ
-        st.download_button(
-            label="⬇ הורדת קובץ CSV",
-            data=open("mapping_data.csv", "rb"),
-            file_name="mapping_data.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("אין עדיין נתונים שנשמרו.")
