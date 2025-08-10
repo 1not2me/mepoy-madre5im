@@ -1,83 +1,76 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import os
 
-# כותרת הדף
-st.title("📋 טופס מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו")
-st.write("""
-שלום רב, מטרת טופס זה היא לאסוף מידע עדכני על מדריכים ומוסדות הכשרה לקראת שיבוץ הסטודנטים לשנת ההכשרה הקרובה.
-אנא מלא/י את כל השדות בצורה מדויקת. המידע ישמש לצורך תכנון השיבוץ בלבד.
-""")
+st.title("📋 מיפוי מדריכים לשיבוץ סטודנטים - שנת הכשרה תשפ\"ו")
 
-# יצירת טופס
+# --- טופס מילוי ---
 with st.form("mapping_form"):
     st.subheader("פרטים אישיים")
     full_name = st.text_input("שם מלא של המדריך/ה")
-    first_name = st.text_input("שם פרטי")
     last_name = st.text_input("שם משפחה")
-    training_institution = st.text_input("מוסד / שירות ההכשרה")
-    specialty = st.selectbox("תחום ההתמחות", ["Please Select", "תחום א", "תחום ב", "תחום ג", "אחר"])
-    other_specialty = ""
+    first_name = st.text_input("שם פרטי")
+    institution = st.text_input("מוסד / שירות ההכשרה")
+    specialty = st.selectbox("תחום ההתמחות", ["Please Select", "חינוך", "בריאות", "חברה", "אחר"])
+    specialty_other = ""
     if specialty == "אחר":
-        other_specialty = st.text_input("אם ציינת אחר, אנא כתוב את תחום ההתמחות")
-
-    st.subheader("כתובת מקום ההכשרה")
+        specialty_other = st.text_input("אם ציינת אחר, אנא כתוב את תחום ההתמחות")
     street = st.text_input("רחוב")
     city = st.text_input("עיר")
-    postal_code = st.text_input("מיקוד")
-
-    students_count = st.number_input("מספר סטודנטים שניתן לקלוט השנה", min_value=0, step=1)
-    continue_training = st.radio("האם מעוניין/ת להמשיך להדריך השנה?", ["כן", "לא"])
-    phone = st.text_input("טלפון")
+    zip_code = st.text_input("מיקוד")
+    students_num = st.number_input("מספר סטודנטים שניתן לקלוט השנה", min_value=0, step=1)
+    continue_teaching = st.radio("האם מעוניין/ת להמשיך להדריך השנה", ["כן", "לא"])
+    phone = st.text_input("טלפון (בפורמט 000-0000000)")
     email = st.text_input("כתובת אימייל")
-    
-    notes = st.text_area("הערות")
 
-    submit_btn = st.form_submit_button("שלח")
+    submit_btn = st.form_submit_button("שלח/י")
 
-# שמירת הנתונים אם נשלח
+# --- שמירת נתונים ---
 if submit_btn:
     data = {
         "תאריך": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
         "שם מלא": [full_name],
-        "שם פרטי": [first_name],
         "שם משפחה": [last_name],
-        "מוסד / שירות ההכשרה": [training_institution],
-        "תחום התמחות": [specialty if specialty != "אחר" else other_specialty],
+        "שם פרטי": [first_name],
+        "מוסד / שירות ההכשרה": [institution],
+        "תחום ההתמחות": [specialty if specialty != "אחר" else specialty_other],
         "רחוב": [street],
         "עיר": [city],
-        "מיקוד": [postal_code],
-        "מספר סטודנטים": [students_count],
-        "ממשיך הדרכה": [continue_training],
+        "מיקוד": [zip_code],
+        "מס' סטודנטים": [students_num],
+        "המשך הדרכה": [continue_teaching],
         "טלפון": [phone],
-        "אימייל": [email],
-        "הערות": [notes]
+        "אימייל": [email]
     }
 
     df = pd.DataFrame(data)
 
-    try:
-        existing_df = pd.read_csv("mapping_data.csv")
+    file_path = "mapping_data.csv"
+    if os.path.exists(file_path):
+        existing_df = pd.read_csv(file_path)
         updated_df = pd.concat([existing_df, df], ignore_index=True)
-        updated_df.to_csv("mapping_data.csv", index=False)
-    except FileNotFoundError:
-        df.to_csv("mapping_data.csv", index=False)
+        updated_df.to_csv(file_path, index=False)
+    else:
+        df.to_csv(file_path, index=False)
 
     st.success("✅ הנתונים נשמרו בהצלחה!")
 
-# הצגת הנתונים — יוצג רק כשאת פותחת את האפליקציה דרך החשבון שלך
-if st.sidebar.checkbox("הצג את כל התשובות (למנהל בלבד)"):
-    try:
-        all_data = pd.read_csv("mapping_data.csv")
-        st.subheader("📄 כל התשובות שנשמרו:")
-        st.dataframe(all_data)
+# --- גישה למנהלת בלבד ---
+st.markdown("---")
+password = st.text_input("הכנסי סיסמה כדי לצפות בתשובות", type="password")
+if password == "rawan123":  # סיסמה שאת מגדירה
+    if os.path.exists("mapping_data.csv"):
+        df = pd.read_csv("mapping_data.csv")
+        st.subheader("📄 כל התשובות שנשמרו")
+        st.dataframe(df)
 
-        csv = all_data.to_csv(index=False).encode('utf-8-sig')
+        # כפתור להורדת הקובץ
         st.download_button(
-            label="📥 הורד את כל התשובות כ-CSV",
-            data=csv,
+            label="⬇ הורדת קובץ CSV",
+            data=open("mapping_data.csv", "rb"),
             file_name="mapping_data.csv",
             mime="text/csv"
         )
-    except FileNotFoundError:
-        st.warning("אין עדיין תשובות שמורות.")
+    else:
+        st.info("אין עדיין נתונים שנשמרו.")
