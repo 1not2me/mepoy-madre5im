@@ -1,54 +1,62 @@
 import streamlit as st
 import pandas as pd
-import base64
-import requests
+from github import Github
+import io
 
-# פרטי ההתחברות ל-GitHub
+# ===== הגדרות GitHub =====
 GITHUB_TOKEN = "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"
-REPO_OWNER = "1not2me"  # שם המשתמש שלך ב-GitHub
-REPO_NAME = "mepoy-madre5im"  # שם הריפו
-FILE_PATH = "mapping_data.csv"  # שם הקובץ בדיוק כמו שהוא בריפו
-BRANCH = "main"
+REPO_NAME = "1not2me/mepoy-madre5im"  # שם המשתמש/שם הריפו
+FILE_PATH = "mapping_data.csv"        # הנתיב לקובץ בריפו
 
-# טופס ב-Streamlit
-st.title("📋 טופס שמירה ל-GitHub")
-name = st.text_input("שם")
-age = st.number_input("גיל", min_value=0, max_value=120, step=1)
+# התחברות ל־GitHub
+g = Github(GITHUB_TOKEN)
+repo = g.get_repo(REPO_NAME)
 
-if st.button("📤 שלח ושמור"):
-    # שליפת תוכן קובץ קיים מ-GitHub
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}?ref={BRANCH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    response = requests.get(url, headers=headers)
+# פונקציה לקריאת הקובץ הקיים
+def load_data():
+    try:
+        file_content = repo.get_contents(FILE_PATH)
+        data = file_content.decoded_content.decode()
+        return pd.read_csv(io.StringIO(data))
+    except:
+        return pd.DataFrame(columns=["שם משפחה", "שם פרטי", "מוסד / שירות ההכשרה", "תחום ההתמחות", "כתובת", "מספר סטודנטים", "טלפון", "אימייל"])
 
-    if response.status_code == 200:
-        file_data = response.json()
-        content = base64.b64decode(file_data["content"]).decode()
-        df = pd.read_csv(pd.compat.StringIO(content))
-    else:
-        df = pd.DataFrame(columns=["שם", "גיל"])
+# פונקציה לשמירת נתונים ל־GitHub
+def save_data(df):
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    try:
+        file = repo.get_contents(FILE_PATH)
+        repo.update_file(FILE_PATH, "עדכון טופס", csv_buffer.getvalue(), file.sha)
+    except:
+        repo.create_file(FILE_PATH, "יצירת טופס", csv_buffer.getvalue())
 
-    # הוספת שורה חדשה
-    new_row = pd.DataFrame([[name, age]], columns=["שם", "גיל"])
-    df = pd.concat([df, new_row], ignore_index=True)
+# ===== עיצוב הטופס =====
+st.title("📋 מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו")
+st.write("אנא מלא/י את כל השדות. המידע ישמש לתכנון השיבוץ בלבד.")
 
-    # המרה לבסיס64 לפני שמירה
-    csv_content = df.to_csv(index=False)
-    b64_content = base64.b64encode(csv_content.encode()).decode()
+with st.form("form"):
+    last_name = st.text_input("שם משפחה*")
+    first_name = st.text_input("שם פרטי*")
+    institution = st.text_input("מוסד / שירות ההכשרה*")
+    specialty = st.text_input("תחום ההתמחות*")
+    address = st.text_input("כתובת מלאה*")
+    students_num = st.number_input("מספר סטודנטים שניתן לקלוט השנה*", min_value=0)
+    phone = st.text_input("טלפון*")
+    email = st.text_input("אימייל*")
+    submitted = st.form_submit_button("שלח")
 
-    # שמירה חזרה ל-GitHub
-    data = {
-        "message": "עדכון mapping_data.csv מהטופס",
-        "content": b64_content,
-        "branch": BRANCH
-    }
+if submitted:
+    df = load_data()
+    df.loc[len(df)] = [last_name, first_name, institution, specialty, address, students_num, phone, email]
+    save_data(df)
+    st.success("✅ הטופס נשלח בהצלחה ונשמר ב־GitHub!")
 
-    if response.status_code == 200:
-        data["sha"] = file_data["sha"]  # כדי לעדכן קובץ קיים
-
-    put_response = requests.put(url, headers=headers, json=data)
-
-    if put_response.status_code in [200, 201]:
-        st.success("✅ הנתונים נשמרו בהצלחה ב-GitHub!")
-    else:
-        st.error(f"שגיאה בשמירה: {put_response.status_code}")
+# ===== למנהל בלבד - הצגת הנתונים =====
+password = st.sidebar.text_input("סיסמת מנהל", type="password")
+if password == "rawan_0304":
+    st.sidebar.success("ברוכה הבאה מנהלת!")
+    data = load_data()
+    st.write("📊 כל הנתונים שנשמרו:")
+    st.dataframe(data)
+    st.download_button("⬇ הורד CSV", data.to_csv(index=False), file_name="mapping_data.csv", mime="text/csv")
