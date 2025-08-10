@@ -42,7 +42,6 @@ with st.form("mapping_form"):
 if submit_btn:
     errors = []
 
-    # בדיקות חובה
     if not last_name.strip():
         errors.append("יש למלא שם משפחה")
     if not first_name.strip():
@@ -95,11 +94,20 @@ if submit_btn:
             df.to_csv("mapping_data.csv", index=False)
 
         st.success("✅ הנתונים נשמרו בהצלחה!")
-        st.dataframe(df)
-# הצגת כל הנתונים שנשמרו
+
+# הצגת כל התשובות וכפתור להורדה
 st.subheader("📄 כל התשובות שהתקבלו")
 try:
     all_data = pd.read_csv("mapping_data.csv")
     st.dataframe(all_data)
+
+    csv = all_data.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        label="⬇️ הורד קובץ CSV",
+        data=csv,
+        file_name="mapping_data.csv",
+        mime="text/csv"
+    )
+
 except FileNotFoundError:
     st.info("עדיין אין נתונים להצגה.")
