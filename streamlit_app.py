@@ -1,59 +1,62 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import os
+from github import Github
+import io
 
-st.title("📋 מיפוי מדריכים לשיבוץ סטודנטים - שנת הכשרה תשפ\"ו")
+# הגדרות GitHub
+GITHUB_TOKEN = "הכניסי_כאן_את_הטוקן_שלך"
+GITHUB_REPO = "המשתמש_שלך/mapping-data"  # למשל: rawansaab/mapping-data
+CSV_FILE_PATH = "mapping_data.csv"
 
-# --- טופס מילוי ---
+st.title("📋 טופס מיפוי מדריכים")
+
 with st.form("mapping_form"):
     st.subheader("פרטים אישיים")
-    full_name = st.text_input("שם מלא של המדריך/ה")
-    last_name = st.text_input("שם משפחה")
-    first_name = st.text_input("שם פרטי")
-    institution = st.text_input("מוסד / שירות ההכשרה")
-    specialty = st.selectbox("תחום ההתמחות", ["Please Select", "חינוך", "בריאות", "חברה", "אחר"])
-    specialty_other = ""
-    if specialty == "אחר":
-        specialty_other = st.text_input("אם ציינת אחר, אנא כתוב את תחום ההתמחות")
-    street = st.text_input("רחוב")
+    full_name = st.text_input("שם מלא")
+    institute = st.text_input("מוסד/שירות ההכשרה")
+    specialization = st.text_input("תחום ההתמחות")
+    address = st.text_input("כתובת מדויקת של מקום ההכשרה")
     city = st.text_input("עיר")
     zip_code = st.text_input("מיקוד")
-    students_num = st.number_input("מספר סטודנטים שניתן לקלוט השנה", min_value=0, step=1)
+    num_students = st.number_input("מספר סטודנטים שניתן לקלוט השנה", min_value=0, step=1)
     continue_teaching = st.radio("האם מעוניין/ת להמשיך להדריך השנה", ["כן", "לא"])
-    phone = st.text_input("טלפון (בפורמט 000-0000000)")
+    phone = st.text_input("טלפון")
     email = st.text_input("כתובת אימייל")
 
-    submit_btn = st.form_submit_button("שלח/י")
+    submit_btn = st.form_submit_button("שלח")
 
-# --- שמירת נתונים ---
 if submit_btn:
     data = {
         "תאריך": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
         "שם מלא": [full_name],
-        "שם משפחה": [last_name],
-        "שם פרטי": [first_name],
-        "מוסד / שירות ההכשרה": [institution],
-        "תחום ההתמחות": [specialty if specialty != "אחר" else specialty_other],
-        "רחוב": [street],
+        "מוסד/שירות": [institute],
+        "תחום התמחות": [specialization],
+        "כתובת": [address],
         "עיר": [city],
         "מיקוד": [zip_code],
-        "מס' סטודנטים": [students_num],
-        "המשך הדרכה": [continue_teaching],
+        "מספר סטודנטים": [num_students],
+        "ממשיך להדריך": [continue_teaching],
         "טלפון": [phone],
         "אימייל": [email]
     }
 
     df = pd.DataFrame(data)
 
-    file_path = "mapping_data.csv"
-    if os.path.exists(file_path):
-        existing_df = pd.read_csv(file_path)
+    # התחברות ל-GitHub
+    g = Github(GITHUB_TOKEN)
+    repo = g.get_repo(GITHUB_REPO)
+
+    try:
+        # קריאת הקובץ הקיים מה-Repo
+        contents = repo.get_contents(CSV_FILE_PATH)
+        existing_df = pd.read_csv(io.BytesIO(contents.decoded_content))
         updated_df = pd.concat([existing_df, df], ignore_index=True)
-        updated_df.to_csv(file_path, index=False)
-    else:
-        df.to_csv(file_path, index=False)
+        csv_bytes = updated_df.to_csv(index=False).encode()
+        repo.update_file(CSV_FILE_PATH, "עדכון טופס", csv_bytes, contents.sha)
+    except:
+        # אם אין קובץ קיים, יוצרים חדש
+        csv_bytes = df.to_csv(index=False).encode()
+        repo.create_file(CSV_FILE_PATH, "יצירת קובץ ראשון", csv_bytes)
 
-    st.success("✅ הנתונים נשמרו בהצלחה!")
-
-
+    st.success("✅ הנתונים נשמרו ב-GitHub בהצלחה!")
