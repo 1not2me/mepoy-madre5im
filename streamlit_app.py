@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import re
+import os
 
 st.set_page_config(page_title="מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו", layout="centered")
 
@@ -42,6 +43,7 @@ with st.form("mapping_form"):
 if submit_btn:
     errors = []
 
+    # בדיקות חובה
     if not last_name.strip():
         errors.append("יש למלא שם משפחה")
     if not first_name.strip():
@@ -86,18 +88,20 @@ if submit_btn:
 
         df = pd.DataFrame(data)
 
-        try:
+        # שמירה לקובץ (בלי ליצור קובץ ריק)
+        if os.path.exists("mapping_data.csv") and os.path.getsize("mapping_data.csv") > 0:
             existing_df = pd.read_csv("mapping_data.csv")
             updated_df = pd.concat([existing_df, df], ignore_index=True)
             updated_df.to_csv("mapping_data.csv", index=False)
-        except FileNotFoundError:
+        else:
             df.to_csv("mapping_data.csv", index=False)
 
         st.success("✅ הנתונים נשמרו בהצלחה!")
+        st.dataframe(df)
 
-# הצגת כל התשובות וכפתור להורדה
+# הצגת כל התשובות + כפתור להורדה
 st.subheader("📄 כל התשובות שהתקבלו")
-try:
+if os.path.exists("mapping_data.csv") and os.path.getsize("mapping_data.csv") > 0:
     all_data = pd.read_csv("mapping_data.csv")
     st.dataframe(all_data)
 
@@ -108,6 +112,5 @@ try:
         file_name="mapping_data.csv",
         mime="text/csv"
     )
-
-except FileNotFoundError:
+else:
     st.info("עדיין אין נתונים להצגה.")
