@@ -88,3 +88,26 @@ if admin_input == ADMIN_PASSWORD:
         st.warning("⚠ עדיין אין נתונים בטופס.")
 elif admin_input:
     st.error("סיסמה שגויה.")
+import pandas as pd
+import os
+
+# הצגת תשובות רק למנהל
+st.markdown("---")
+st.subheader("🔑 כניסת מנהל")
+
+password = st.text_input("הכנסי סיסמה:", type="password")
+if password == "1234":  # כאן את יכולה לשנות לסיסמה שלך
+    if os.path.exists("mapping_data.csv"):
+        df = pd.read_csv("mapping_data.csv")
+        st.dataframe(df)
+
+        # כפתור להורדה
+        csv = df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="⬇ הורד קובץ CSV",
+            data=csv,
+            file_name="mapping_data.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("אין עדיין תשובות במערכת.")
