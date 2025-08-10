@@ -1,54 +1,49 @@
-import streamlit as st
-import pandas as pd
-from github import Github
-from io import StringIO
+import base64
+import requests
+from datetime import datetime
 
-# פרטי גישה לגיטהאב
+# ===== הגדרות GitHub =====
 GITHUB_TOKEN = "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"
-REPO_NAME = "1not2me/mepoy-madre5im"
+REPO_OWNER = "1not2me"
+REPO_NAME = "mepoy-madre5im"
 FILE_PATH = "mapping_data.csv"
 
-# פונקציה לשמירת הנתונים בגיטהאב
-def save_to_github(new_data):
-    g = Github(GITHUB_TOKEN)
-    repo = g.get_repo(REPO_NAME)
+def update_github_csv(new_row):
+    """מעדכן את הקובץ mapping_data.csv ב-GitHub עם שורה חדשה"""
+    # שלב 1: קבלת תוכן קיים
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    r = requests.get(url, headers=headers)
+    r.raise_for_status()
+    file_data = r.json()
     
-    try:
-        contents = repo.get_contents(FILE_PATH)
-        # אם קובץ כבר קיים – מוסיפים אליו
-        existing_data = pd.read_csv(StringIO(contents.decoded_content.decode()))
-        updated_data = pd.concat([existing_data, pd.DataFrame([new_data])], ignore_index=True)
-        csv_content = updated_data.to_csv(index=False)
-        repo.update_file(FILE_PATH, "עדכון נתונים", csv_content, contents.sha)
-    except:
-        # אם הקובץ לא קיים – יוצרים חדש
-        df = pd.DataFrame([new_data])
-        csv_content = df.to_csv(index=False)
-        repo.create_file(FILE_PATH, "יצירת קובץ נתונים", csv_content)
+    sha = file_data["sha"]
+    content = base64.b64decode(file_data["content"]).decode("utf-8")
 
-# טופס
-st.title("מיפוי מדריכים לשיבוץ סטודנטים - שנת הכשרה תשפ\"ו")
-st.write("אנא מלא/י את כל השדות בצורה מדויקת.")
+    # שלב 2: הוספת שורה חדשה
+    content += "\n" + ",".join(new_row)
 
-full_name = st.text_input("שם מלא של המדריך/ה")
-institution = st.text_input("מוסד / שירות ההכשרה")
-specialization = st.text_input("תחום ההתמחות")
-address = st.text_input("כתובת מדויקת של מקום ההכשרה")
-students_number = st.number_input("מספר סטודנטים שניתן לקלוט השנה", min_value=0, step=1)
-continue_training = st.selectbox("האם מעוניין/ת להמשיך להדריך השנה?", ["כן", "לא"])
-phone = st.text_input("טלפון")
-email = st.text_input("כתובת אימייל")
+    # שלב 3: המרת התוכן ל-base64
+    updated_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
 
-if st.button("שלח"):
+    # שלב 4: עדכון הקובץ בגיטהאב
     data = {
-        "שם מלא": full_name,
-        "מוסד / שירות ההכשרה": institution,
-        "תחום ההתמחות": specialization,
-        "כתובת": address,
-        "מספר סטודנטים": students_number,
-        "ממשיך השנה": continue_training,
-        "טלפון": phone,
-        "אימייל": email
+        "message": f"Update {FILE_PATH} - {datetime.now().isoformat()}",
+        "content": updated_content,
+        "sha": sha
     }
-    save_to_github(data)
-    st.success("הטופס נשלח בהצלחה! הנתונים נשמרו ב-GitHub.")
+    put_r = requests.put(url, headers=headers, json=data)
+    put_r.raise_for_status()
+    print("✅ הקובץ עודכן בהצלחה ב-GitHub")
+
+# ===== דוגמה לשמירת נתונים מהטופס =====
+# אחרי שהמשתמש ממלא טופס ב-Streamlit:
+if st.button("שלח"):
+    name = st.text_input("שם")
+    email = st.text_input("אימייל")
+    answer = st.text_area("תשובה")
+
+    # אם המשתמש לחץ שלח – נוסיף את השורה ל-GitHub
+    if name and email and answer:
+        update_github_csv([name, email, answer])
+        st.success("הנתונים נשמרו בהצלחה ב-GitHub!")
