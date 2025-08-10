@@ -88,29 +88,37 @@ if submit_btn:
 
         df = pd.DataFrame(data)
 
-        # שמירה לקובץ (בלי ליצור קובץ ריק)
-        if os.path.exists("mapping_data.csv") and os.path.getsize("mapping_data.csv") > 0:
-            existing_df = pd.read_csv("mapping_data.csv")
-            updated_df = pd.concat([existing_df, df], ignore_index=True)
-            updated_df.to_csv("mapping_data.csv", index=False)
-        else:
+        try:
+            if os.path.exists("mapping_data.csv") and os.path.getsize("mapping_data.csv") > 0:
+                existing_df = pd.read_csv("mapping_data.csv")
+                updated_df = pd.concat([existing_df, df], ignore_index=True)
+                updated_df.to_csv("mapping_data.csv", index=False)
+            else:
+                df.to_csv("mapping_data.csv", index=False)
+        except FileNotFoundError:
             df.to_csv("mapping_data.csv", index=False)
 
         st.success("✅ הנתונים נשמרו בהצלחה!")
         st.dataframe(df)
 
-# הצגת כל התשובות + כפתור להורדה
+# הצגת כל התשובות + כפתור להורדה (גישה מוגבלת בסיסמה)
 st.subheader("📄 כל התשובות שהתקבלו")
-if os.path.exists("mapping_data.csv") and os.path.getsize("mapping_data.csv") > 0:
-    all_data = pd.read_csv("mapping_data.csv")
-    st.dataframe(all_data)
 
-    csv = all_data.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        label="⬇️ הורד קובץ CSV",
-        data=csv,
-        file_name="mapping_data.csv",
-        mime="text/csv"
-    )
-else:
-    st.info("עדיין אין נתונים להצגה.")
+password = st.text_input("הכנסי סיסמת מנהל לצפייה בנתונים", type="password")
+
+if password == "rawan_0304":
+    if os.path.exists("mapping_data.csv") and os.path.getsize("mapping_data.csv") > 0:
+        all_data = pd.read_csv("mapping_data.csv")
+        st.dataframe(all_data)
+
+        csv = all_data.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            label="⬇️ הורד קובץ CSV",
+            data=csv,
+            file_name="mapping_data.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("עדיין אין נתונים להצגה.")
+elif password:
+    st.error("סיסמה שגויה. נסי שוב.")
