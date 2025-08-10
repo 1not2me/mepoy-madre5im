@@ -11,7 +11,7 @@ with st.form("mapping_form"):
     full_name = st.text_input("שם מלא")
     id_number = st.text_input("תעודת זהות")
     city = st.text_input("יישוב מגורים")
-    distance = st.number_input("מרחק ממקום ההכשרה (בק\"מ)", min_value=0.0, step=0.1)
+    distance = st.number_input("מרחק ממקום ההכשרה (בק\"מ)", min_value=0.0, step=10)
 
     st.subheader("ניסיון והעדפות")
     worked_before = st.radio("האם עבדת כבר במקום זה בעבר?", ["כן", "לא"])
