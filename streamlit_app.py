@@ -96,3 +96,10 @@ if submit_btn:
 
         st.success("✅ הנתונים נשמרו בהצלחה!")
         st.dataframe(df)
+# הצגת כל הנתונים שנשמרו
+st.subheader("📄 כל התשובות שהתקבלו")
+try:
+    all_data = pd.read_csv("mapping_data.csv")
+    st.dataframe(all_data)
+except FileNotFoundError:
+    st.info("עדיין אין נתונים להצגה.")
