@@ -31,7 +31,6 @@ with st.form("mapping_form"):
     phone = st.text_input("טלפון")
     email = st.text_input("כתובת אימייל")
     
-    # הערות נוספות
     notes = st.text_area("הערות")
 
     submit_btn = st.form_submit_button("שלח")
@@ -65,18 +64,14 @@ if submit_btn:
         df.to_csv("mapping_data.csv", index=False)
 
     st.success("✅ הנתונים נשמרו בהצלחה!")
-    st.dataframe(df)
 
-# הצגת כל הנתונים (גישה מוגבלת עם סיסמה)
-st.subheader("🔒 גישה למנהלים בלבד")
-password = st.text_input("הכנס סיסמה כדי לצפות בכל התשובות", type="password")
-if password == "Rawan2025":  # ← שנה לסיסמה שאת בוחרת
+# הצגת הנתונים — יוצג רק כשאת פותחת את האפליקציה דרך החשבון שלך
+if st.sidebar.checkbox("הצג את כל התשובות (למנהל בלבד)"):
     try:
         all_data = pd.read_csv("mapping_data.csv")
-        st.write("📄 כל התשובות שנשמרו:")
+        st.subheader("📄 כל התשובות שנשמרו:")
         st.dataframe(all_data)
 
-        # כפתור להורדת הקובץ
         csv = all_data.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 הורד את כל התשובות כ-CSV",
@@ -86,5 +81,3 @@ if password == "Rawan2025":  # ← שנה לסיסמה שאת בוחרת
         )
     except FileNotFoundError:
         st.warning("אין עדיין תשובות שמורות.")
-elif password != "":
-    st.error("❌ סיסמה שגויה")
