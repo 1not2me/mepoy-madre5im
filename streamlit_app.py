@@ -1,61 +1,98 @@
 import streamlit as st
 import pandas as pd
-from github import Github
-import io
+from datetime import datetime
+import re
 
-# ===== הגדרות GitHub =====
-REPO_NAME = "1not2me/mepoy-madre5im"  # שם המשתמש/שם הריפו
-FILE_PATH = "mapping_data.csv"        # הנתיב לקובץ בריפו
+st.set_page_config(page_title="מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו", layout="centered")
 
-# התחברות ל־GitHub
-g = Github(GITHUB_TOKEN)
-repo = g.get_repo(REPO_NAME)
+# כותרת והסבר
+st.title("📋 מיפוי מדריכים לשיבוץ סטודנטים - שנת הכשרה תשפ\"ו")
+st.write("""
+שלום רב, מטרת טופס זה היא לאסוף מידע עדכני על מדריכים ומוסדות הכשרה לקראת שיבוץ הסטודנטים לשנת ההכשרה הקרובה.  
+אנא מלא/י את כל השדות בצורה מדויקת. המידע ישמש לצורך תכנון השיבוץ בלבד.
+""")
 
-# פונקציה לקריאת הקובץ הקיים
-def load_data():
-    try:
-        file_content = repo.get_contents(FILE_PATH)
-        data = file_content.decoded_content.decode()
-        return pd.read_csv(io.StringIO(data))
-    except:
-        return pd.DataFrame(columns=["שם משפחה", "שם פרטי", "מוסד / שירות ההכשרה", "תחום ההתמחות", "כתובת", "מספר סטודנטים", "טלפון", "אימייל"])
+with st.form("mapping_form"):
+    st.subheader("פרטים אישיים")
+    last_name = st.text_input(":שם משפחה *")
+    first_name = st.text_input(":שם פרטי *")
 
-# פונקציה לשמירת נתונים ל־GitHub
-def save_data(df):
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
-    try:
-        file = repo.get_contents(FILE_PATH)
-        repo.update_file(FILE_PATH, "עדכון טופס", csv_buffer.getvalue(), file.sha)
-    except:
-        repo.create_file(FILE_PATH, "יצירת טופס", csv_buffer.getvalue())
+    st.subheader("מוסד והכשרה")
+    institution = st.text_input(":מוסד / שירות ההכשרה *")
+    specialization = st.selectbox(":תחום ההתמחות *", ["Please Select", "חינוך", "בריאות", "רווחה", "אחר"])
+    specialization_other = ""
+    if specialization == "אחר":
+        specialization_other = st.text_input(":אם ציינת אחר, אנא כתוב את תחום ההתמחות *")
 
-# ===== עיצוב הטופס =====
-st.title("📋 מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו")
-st.write("אנא מלא/י את כל השדות. המידע ישמש לתכנון השיבוץ בלבד.")
+    st.subheader("כתובת מקום ההכשרה")
+    street = st.text_input(":רחוב *")
+    city = st.text_input("עיר *")
+    postal_code = st.text_input(":מיקוד *")
 
-with st.form("form"):
-    last_name = st.text_input("שם משפחה*")
-    first_name = st.text_input("שם פרטי*")
-    institution = st.text_input("מוסד / שירות ההכשרה*")
-    specialty = st.text_input("תחום ההתמחות*")
-    address = st.text_input("כתובת מלאה*")
-    students_num = st.number_input("מספר סטודנטים שניתן לקלוט השנה*", min_value=0)
-    phone = st.text_input("טלפון*")
-    email = st.text_input("אימייל*")
-    submitted = st.form_submit_button("שלח")
+    st.subheader("קליטת סטודנטים")
+    num_students = st.number_input(":מספר סטודנטים שניתן לקלוט השנה *", min_value=0, step=1)
+    continue_mentoring = st.radio("?האם מעוניין/ת להמשיך להדריך השנה *", ["כן", "לא"])
 
-if submitted:
-    df = load_data()
-    df.loc[len(df)] = [last_name, first_name, institution, specialty, address, students_num, phone, email]
-    save_data(df)
-    st.success("✅ הטופס נשלח בהצלחה ונשמר ב־GitHub!")
+    st.subheader("פרטי התקשרות")
+    phone = st.text_input(":טלפון * (לדוגמה: 050-1234567)")
+    email = st.text_input(":כתובת אימייל *")
 
-# ===== למנהל בלבד - הצגת הנתונים =====
-password = st.sidebar.text_input("סיסמת מנהל", type="password")
-if password == "rawan_0304":
-    st.sidebar.success("ברוכה הבאה מנהלת!")
-    data = load_data()
-    st.write("📊 כל הנתונים שנשמרו:")
-    st.dataframe(data)
-    st.download_button("⬇ הורד CSV", data.to_csv(index=False), file_name="mapping_data.csv", mime="text/csv")
+    submit_btn = st.form_submit_button("שלח/י")
+
+if submit_btn:
+    errors = []
+
+    # בדיקות חובה
+    if not last_name.strip():
+        errors.append("יש למלא שם משפחה")
+    if not first_name.strip():
+        errors.append("יש למלא שם פרטי")
+    if not institution.strip():
+        errors.append("יש למלא מוסד/שירות ההכשרה")
+    if specialization == "Please Select":
+        errors.append("יש לבחור תחום התמחות")
+    if specialization == "אחר" and not specialization_other.strip():
+        errors.append("יש למלא את תחום ההתמחות")
+    if not street.strip():
+        errors.append("יש למלא רחוב")
+    if not city.strip():
+        errors.append("יש למלא עיר")
+    if not postal_code.strip():
+        errors.append("יש למלא מיקוד")
+    if num_students <= 0:
+        errors.append("יש להזין מספר סטודנטים גדול מ-0")
+    if not re.match(r"^0\d{1,2}-\d{6,7}$", phone.strip()):
+        errors.append("מספר הטלפון אינו תקין")
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email.strip()):
+        errors.append("כתובת האימייל אינה תקינה")
+
+    if errors:
+        for e in errors:
+            st.error(e)
+    else:
+        data = {
+            "תאריך": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+            "שם משפחה": [last_name],
+            "שם פרטי": [first_name],
+            "מוסד/שירות ההכשרה": [institution],
+            "תחום התמחות": [specialization_other if specialization == "אחר" else specialization],
+            "רחוב": [street],
+            "עיר": [city],
+            "מיקוד": [postal_code],
+            "מספר סטודנטים": [num_students],
+            "המשך הדרכה": [continue_mentoring],
+            "טלפון": [phone],
+            "אימייל": [email]
+        }
+
+        df = pd.DataFrame(data)
+
+        try:
+            existing_df = pd.read_csv("mapping_data.csv")
+            updated_df = pd.concat([existing_df, df], ignore_index=True)
+            updated_df.to_csv("mapping_data.csv", index=False)
+        except FileNotFoundError:
+            df.to_csv("mapping_data.csv", index=False)
+
+        st.success("✅ הנתונים נשמרו בהצלחה!")
+        st.dataframe(df)
