@@ -4,7 +4,6 @@ from github import Github
 import io
 
 # ===== הגדרות GitHub =====
-GITHUB_TOKEN = "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"
 REPO_NAME = "1not2me/mepoy-madre5im"  # שם המשתמש/שם הריפו
 FILE_PATH = "mapping_data.csv"        # הנתיב לקובץ בריפו
 
