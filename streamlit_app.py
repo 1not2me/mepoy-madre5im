@@ -122,7 +122,7 @@ def load_sites_catalog() -> pd.DataFrame:
             if opt in cols: return cols[opt]
         return None
 
-    col_institution = pick('שם מוסד', 'מוסד', 'שם מוסד/שירות ההכשרה')
+    col_institution = pick('מוסד')
     col_spec = pick('תחום התמחות', 'תחום', 'התמחות')
 
     if not col_institution or not col_spec:
