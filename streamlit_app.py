@@ -105,7 +105,7 @@ def load_sites_catalog() -> pd.DataFrame:
     מנסה לקרוא קטלוג מוסדות. מצפה לעמודות:
     - 'שם מוסד' (או חלופות: 'מוסד', 'שם מוסד/שירות ההכשרה')
     - 'תחום התמחות' (או חלופות: 'תחום', 'התמחות')
-    אם חסר או לא קיים – מחזיר DF ריק ומציג אזהרה עדינה.
+    אם חסר או לא קיים – מחזיר DF ריק ומציג אזהרה עדינה (ללא חריגה).
     """
     if not SITES_FILE.exists():
         return pd.DataFrame()
@@ -117,21 +117,28 @@ def load_sites_catalog() -> pd.DataFrame:
 
     # נרמול שמות עמודות אפשריים
     cols = {c.strip(): c for c in df.columns}
+
     def pick(*options):
         for opt in options:
-            if opt in cols: return cols[opt]
+            if opt in cols:
+                return cols[opt]
         return None
 
-    col_institution = pick('מוסד')
-    col_spec = pick('תחום התמחות', 'תחום', 'התמחות')
+    # נסיונות זיהוי גמישים
+    col_institution = pick('שם מוסד', 'מוסד', 'שם מוסד/שירות ההכשרה')
+    col_spec        = pick('תחום התמחות', 'תחום', 'התמחות')
 
     if not col_institution or not col_spec:
         st.warning("⚠ בקובץ האתרים חסרות עמודות חובה: 'שם מוסד' / 'תחום התמחות'. הטופס יעבוד במצב קלט חופשי.")
         return pd.DataFrame()
 
-    clean = df[[col_institution, col_spec]].rename(
-        columns={col_institution: 'שם מוסד', col_spec: 'תחום התמחות'}
-    ).dropna().drop_duplicates().reset_index(drop=True)
+    clean = (
+        df[[col_institution, col_spec]]
+        .rename(columns={col_institution: 'שם מוסד', col_spec: 'תחום התמחות'})
+        .dropna()
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
 
     # ניקוי טקסט בסיסי
     for c in ['שם מוסד', 'תחום התמחות']:
@@ -317,5 +324,5 @@ if submit_btn:
         # 2) רישום ליומן (Append-Only)
         append_to_log(new_row_df)
 
-        # ✅ הודעת הצלחה תקינה (תיקון השורה השבורה)
-        st.success("✅ הנתונים נשמרו בהצלחה!)")
+        # ✅ הודעת הצלחה תקינה
+        st.success("✅ הנתונים נשמרו בהצלחה!")
