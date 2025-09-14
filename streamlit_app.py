@@ -21,6 +21,7 @@ BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 CSV_FILE = DATA_DIR / "mapping_data.csv"          # קובץ ראשי (נשמר ומעודכן לאורך זמן)
 CSV_LOG_FILE = DATA_DIR / "mapping_data_log.csv"  # קובץ יומן הוספות (Append-Only)
+SITES_FILE = DATA_DIR / "sites_catalog.csv"       # אופציונלי: קטלוג מוסדות/תחומים
 
 # ===== עיצוב =====
 st.markdown("""
@@ -31,12 +32,8 @@ st.markdown("""
   --ring:rgba(99,102,241,.25); 
   --card:rgba(255,255,255,.85);
 }
-
-/* RTL + פונטים */
 html, body, [class*="css"] { font-family: system-ui, "Segoe UI", Arial; }
 .stApp, .main, [data-testid="stSidebar"]{ direction:rtl; text-align:right; }
-
-/* רקע */
 [data-testid="stAppViewContainer"]{
   background:
     radial-gradient(1200px 600px at 8% 8%, #e0f7fa 0%, transparent 65%),
@@ -44,8 +41,6 @@ html, body, [class*="css"] { font-family: system-ui, "Segoe UI", Arial; }
     radial-gradient(900px 500px at 20% 90%, #fff3e0 0%, transparent 55%);
 }
 .block-container{ padding-top:1.1rem; }
-
-/* מסגרת לטופס */
 [data-testid="stForm"]{
   background:var(--card);
   border:1px solid #e2e8f0;
@@ -53,55 +48,35 @@ html, body, [class*="css"] { font-family: system-ui, "Segoe UI", Arial; }
   padding:18px 20px;
   box-shadow:0 8px 24px rgba(2,6,23,.06);
 }
-
-/* תוויות + נקודתיים מימין */
-[data-testid="stWidgetLabel"] p{
-  text-align:right; 
-  margin-bottom:.25rem; 
-  color:var(--muted); 
-}
-[data-testid="stWidgetLabel"] p::after{
-  content: " :";
-}
-
-/* שדות */
+[data-testid="stWidgetLabel"] p{ text-align:right; margin-bottom:.25rem; color:var(--muted); }
+[data-testid="stWidgetLabel"] p::after{ content: " :"; }
 input, textarea, select{ direction:rtl; text-align:right; }
 </style>
 """, unsafe_allow_html=True)
 
 # ===== פונקציות עזר לקבצים =====
 def load_csv_safely(path: Path) -> pd.DataFrame:
-    """קריאה בטוחה של CSV אם קיים, אחרת מחזיר DataFrame ריק עם עמודות סטנדרטיות (אם ידועות)."""
+    """קריאה בטוחה של CSV אם קיים, אחרת מחזיר DataFrame ריק."""
     if path.exists():
         try:
             return pd.read_csv(path)
         except Exception:
-            # אם יש בעיה בקריאה, ננסה עם encoding חלופי
             return pd.read_csv(path, encoding="utf-8-sig")
-    else:
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 def save_master_dataframe(df: pd.DataFrame) -> None:
     """
-    שומר את המסד הראשי (mapping_data.csv) בצורה אטומית.
-    לא מוחק רשומות קיימות – רק מעדכן את הקובץ עם כל הנתונים.
-    שומר גם גיבוי מתוארך בתיקיית backups.
+    שומר את המסד הראשי בצורה אטומית + יוצר גיבוי מתוארך.
     """
-    # שמירה אטומית: כתיבה לקובץ זמני ואז החלפה
     temp_path = CSV_FILE.with_suffix(".tmp.csv")
     df.to_csv(temp_path, index=False, encoding="utf-8-sig")
     temp_path.replace(CSV_FILE)
-
-    # שמירת גיבוי מתוארך
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_path = BACKUP_DIR / f"mapping_data_{ts}.csv"
     df.to_csv(backup_path, index=False, encoding="utf-8-sig")
 
 def append_to_log(row_df: pd.DataFrame) -> None:
-    """
-    רישום Append-Only של כל הרשומות שנוספו, כדי שלעולם לא ילכו לאיבוד.
-    כותב כותרת רק אם הקובץ עדיין לא קיים.
-    """
+    """Append-Only: לעולם לא מוחקים, רק מוסיפים שורה חדשה."""
     file_exists = CSV_LOG_FILE.exists()
     row_df.to_csv(
         CSV_LOG_FILE,
@@ -112,19 +87,64 @@ def append_to_log(row_df: pd.DataFrame) -> None:
     )
 
 def dataframe_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Sheet1") -> bytes:
-    """ממיר DataFrame לקובץ Excel בזיכרון (BytesIO)."""
+    """ממיר DataFrame ל-XLSX בזיכרון (BytesIO)."""
     bio = BytesIO()
-    try:
-        with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name=sheet_name)
-        bio.seek(0)
-        return bio.read()
-    except Exception:
-        # אם xlsxwriter לא זמין, נחזיר None ונמנע מכפתור אקסל
-        return b""
+    with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+        # התאמת רוחב עמודות בסיסית
+        ws = writer.sheets[sheet_name]
+        for i, col in enumerate(df.columns):
+            width = min(60, max(12, int(df[col].astype(str).map(len).max() if not df.empty else 12) + 4))
+            ws.set_column(i, i, width)
+    bio.seek(0)
+    return bio.read()
+
+# ===== קריאת קטלוג מוסדות (אופציונלי) =====
+def load_sites_catalog() -> pd.DataFrame:
+    """
+    מנסה לקרוא קטלוג מוסדות. מצפה לעמודות:
+    - 'שם מוסד' (או חלופות: 'מוסד', 'שם מוסד/שירות ההכשרה')
+    - 'תחום התמחות' (או חלופות: 'תחום', 'התמחות')
+    אם חסר או לא קיים – מחזיר DF ריק ומציג אזהרה עדינה.
+    """
+    if not SITES_FILE.exists():
+        return pd.DataFrame()
+
+    df = load_csv_safely(SITES_FILE)
+    if df.empty:
+        st.warning("⚠ קובץ המוסדות קיים אך ריק.")
+        return pd.DataFrame()
+
+    # נרמול שמות עמודות אפשריים
+    cols = {c.strip(): c for c in df.columns}
+    def pick(*options):
+        for opt in options:
+            if opt in cols: return cols[opt]
+        return None
+
+    col_institution = pick('שם מוסד', 'מוסד', 'שם מוסד/שירות ההכשרה')
+    col_spec = pick('תחום התמחות', 'תחום', 'התמחות')
+
+    if not col_institution or not col_spec:
+        st.warning("⚠ בקובץ האתרים חסרות עמודות חובה: 'שם מוסד' / 'תחום התמחות'. הטופס יעבוד במצב קלט חופשי.")
+        return pd.DataFrame()
+
+    clean = df[[col_institution, col_spec]].rename(
+        columns={col_institution: 'שם מוסד', col_spec: 'תחום התמחות'}
+    ).dropna().drop_duplicates().reset_index(drop=True)
+
+    # ניקוי טקסט בסיסי
+    for c in ['שם מוסד', 'תחום התמחות']:
+        clean[c] = clean[c].astype(str).str.strip()
+
+    return clean
+
+sites_df = load_sites_catalog()
+sites_available = not sites_df.empty
+known_specs = sorted(sites_df['תחום התמחות'].dropna().unique().tolist()) if sites_available else []
+known_institutions = sorted(sites_df['שם מוסד'].dropna().unique().tolist()) if sites_available else []
 
 # ===== בדיקת מצב מנהל =====
-# תמיכה ב-Streamlit חדשים: st.query_params הוא מילון של מחרוזות
 params = st.query_params if hasattr(st, "query_params") else {}
 admin_flag = params.get("admin", "0")
 is_admin_mode = (admin_flag == "1")
@@ -141,7 +161,6 @@ if is_admin_mode:
         df_master = load_csv_safely(CSV_FILE)
         df_log = load_csv_safely(CSV_LOG_FILE)
 
-        # מידע כללי
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("📦 קובץ ראשי (מצטבר)")
@@ -150,26 +169,17 @@ if is_admin_mode:
             st.subheader("🧾 קובץ יומן (Append-Only)")
             st.write(f"סה\"כ רשומות (יומן): **{len(df_log)}**")
 
-        # תצוגה והורדות
+        # תצוגה והורדות – XLSX בלבד לפי בקשה
         st.markdown("### הצגת הקובץ הראשי")
         if not df_master.empty:
             st.dataframe(df_master, use_container_width=True)
             st.download_button(
-                "📥 הורד CSV (ראשי)",
-                data=df_master.to_csv(index=False, encoding="utf-8-sig"),
-                file_name="mapping_data.csv",
-                mime="text/csv",
-                key="dl_master_csv"
+                "📊 הורד Excel (ראשי)",
+                data=dataframe_to_excel_bytes(df_master, sheet_name="Master"),
+                file_name="mapping_data.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_master_xlsx"
             )
-            excel_bytes = dataframe_to_excel_bytes(df_master)
-            if excel_bytes:
-                st.download_button(
-                    "📊 הורד Excel (ראשי)",
-                    data=excel_bytes,
-                    file_name="mapping_data.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_master_xlsx"
-                )
         else:
             st.info("⚠ עדיין אין נתונים בקובץ הראשי.")
 
@@ -178,24 +188,14 @@ if is_admin_mode:
         if not df_log.empty:
             st.dataframe(df_log, use_container_width=True)
             st.download_button(
-                "📥 הורד CSV (יומן)",
-                data=df_log.to_csv(index=False, encoding="utf-8-sig"),
-                file_name="mapping_data_log.csv",
-                mime="text/csv",
-                key="dl_log_csv"
+                "📊 הורד Excel (יומן)",
+                data=dataframe_to_excel_bytes(df_log, sheet_name="Log"),
+                file_name="mapping_data_log.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_log_xlsx"
             )
-            excel_bytes_log = dataframe_to_excel_bytes(df_log, sheet_name="Log")
-            if excel_bytes_log:
-                st.download_button(
-                    "📊 הורד Excel (יומן)",
-                    data=excel_bytes_log,
-                    file_name="mapping_data_log.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_log_xlsx"
-                )
         else:
             st.info("⚠ עדיין אין נתונים ביומן.")
-
     else:
         if password:
             st.error("סיסמה שגויה")
@@ -214,15 +214,20 @@ with st.form("mapping_form"):
     first_name = st.text_input("שם פרטי *", key="first_name")
 
     st.subheader("מוסד והכשרה")
-    institution = st.text_input("מוסד / שירות ההכשרה *", key="institution")
-    specialization = st.selectbox(
-        "תחום ההתמחות *",
-        ["בחר מהרשימה", "חינוך", "בריאות", "רווחה", "אחר"],
-        key="specialization"
-    )
-    specialization_other = ""
-    if specialization == "אחר":
-        specialization_other = st.text_input("אם ציינת אחר, אנא כתוב את תחום ההתמחות *", key="specialization_other")
+    # אם יש קטלוג – נשתמש ב-Selectbox; אחרת שדה חופשי
+    if sites_available:
+        specialization = st.selectbox("תחום ההתמחות *", ["בחר מהרשימה"] + known_specs, key="specialization")
+        # מוסדות מסוננים לפי תחום שבחרו (אם נבחר)
+        filtered_institutions = (
+            sorted(sites_df[sites_df['תחום התמחות'] == specialization]['שם מוסד'].unique().tolist())
+            if specialization in known_specs else known_institutions
+        )
+        institution = st.selectbox("מוסד / שירות ההכשרה *", ["בחר מהרשימה"] + filtered_institutions, key="institution_select")
+        specialization_other = ""  # לא נדרש כשיש קטלוג
+    else:
+        specialization = st.selectbox("תחום ההתמחות *", ["בחר מהרשימה", "חינוך", "בריאות", "רווחה", "אחר"], key="specialization")
+        institution = st.text_input("מוסד / שירות ההכשרה *", key="institution")
+        specialization_other = st.text_input("אם ציינת 'אחר', אנא כתוב/י את תחום ההתמחות *", key="specialization_other") if specialization == "אחר" else ""
 
     st.subheader("כתובת מקום ההכשרה")
     street = st.text_input("רחוב *", key="street")
@@ -247,19 +252,33 @@ if submit_btn:
         errors.append("יש למלא שם משפחה")
     if not first_name.strip():
         errors.append("יש למלא שם פרטי")
-    if not institution.strip():
-        errors.append("יש למלא מוסד/שירות ההכשרה")
-    if specialization == "בחר מהרשימה":
-        errors.append("יש לבחור תחום התמחות")
-    if specialization == "אחר" and not specialization_other.strip():
-        errors.append("יש למלא את תחום ההתמחות")
+
+    # אימות מוסד/התמחות בהתאם לזמינות קטלוג
+    if sites_available:
+        if specialization == "בחר מהרשימה":
+            errors.append("יש לבחור תחום התמחות")
+        if institution == "בחר מהרשימה":
+            errors.append("יש לבחור מוסד/שירות הכשרה")
+        # ולידציה שהמוסד תואם לתחום שנבחר
+        if specialization in known_specs and institution in known_institutions:
+            ok = not sites_df[(sites_df['תחום התמחות'] == specialization) & (sites_df['שם מוסד'] == institution)].empty
+            if not ok:
+                errors.append("המוסד שנבחר אינו תואם לתחום ההתמחות שבחרת.")
+    else:
+        if not institution.strip():
+            errors.append("יש למלא מוסד/שירות ההכשרה")
+        if specialization == "בחר מהרשימה":
+            errors.append("יש לבחור תחום התמחות")
+        if specialization == "אחר" and not specialization_other.strip():
+            errors.append("יש למלא את תחום ההתמחות")
+
     if not street.strip():
         errors.append("יש למלא רחוב")
     if not city.strip():
         errors.append("יש למלא עיר")
     if not postal_code.strip():
         errors.append("יש למלא מיקוד")
-    # תיקון Regex: אין צורך ב-\\ בתוך r-string
+    # טלפון ואימייל
     if not re.match(r"^0\d{1,2}-\d{6,7}$", phone.strip()):
         errors.append("מספר הטלפון אינו תקין (דוגמה תקינה: 050-1234567)")
     if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email.strip()):
@@ -270,12 +289,16 @@ if submit_btn:
             st.error(e)
     else:
         # בניית הרשומה לשמירה
+        final_spec = specialization if (sites_available and specialization in known_specs and specialization != "בחר מהרשימה") else \
+                     (specialization_other.strip() if specialization == "אחר" else specialization)
+        final_institution = institution if (sites_available and institution != "בחר מהרשימה") else institution.strip()
+
         record = {
             "תאריך": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "שם משפחה": last_name.strip(),
             "שם פרטי": first_name.strip(),
-            "מוסד/שירות ההכשרה": institution.strip(),
-            "תחום התמחות": (specialization_other.strip() if specialization == "אחר" else specialization),
+            "מוסד/שירות ההכשרה": final_institution,
+            "תחום התמחות": final_spec,
             "רחוב": street.strip(),
             "עיר": city.strip(),
             "מיקוד": postal_code.strip(),
@@ -286,12 +309,13 @@ if submit_btn:
         }
         new_row_df = pd.DataFrame([record])
 
-        # 1) טען את המסד הראשי הקיים (אם יש), הוסף, ושמור (ללא מחיקה)
+        # 1) עדכון הקובץ הראשי (ללא מחיקה) + גיבוי מתוארך
         master_df = load_csv_safely(CSV_FILE)
         master_df = pd.concat([master_df, new_row_df], ignore_index=True)
-        save_master_dataframe(master_df)  # שמירה אטומית + גיבוי מתוארך
+        save_master_dataframe(master_df)
 
-        # 2) כתיבה Append-Only ליומן
+        # 2) רישום ליומן (Append-Only)
         append_to_log(new_row_df)
 
-        st.success("✅ הנתונים נשמרו בהצלחה!")
+        # ✅ הודעת הצלחה תקינה (תיקון השורה השבורה)
+        st.success("✅ הנתונים נשמרו בהצלחה!)")
