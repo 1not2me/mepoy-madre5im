@@ -341,4 +341,4 @@ if submit_btn:
         # 2) רישום ליומן (Append-Only)
         append_to_log(new_row_df)
 
-        st.success("✅ הנתונים נשמרו בהצלחה! (שם פרטי לפני שם משפחה בכל המקומות)")
+        st.success("✅ הנתונים נשמרו בהצלחה! ")
