@@ -19,9 +19,31 @@ BACKUP_DIR = DATA_DIR / "backups"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
-CSV_FILE = DATA_DIR / "mapping_data.csv"          # קובץ ראשי (נשמר ומעודכן לאורך זמן)
+CSV_FILE = DATA_DIR / "mapping_data.csv"          # קובץ ראשי (נשמר ומעודכן)
 CSV_LOG_FILE = DATA_DIR / "mapping_data_log.csv"  # קובץ יומן הוספות (Append-Only)
 SITES_FILE = DATA_DIR / "sites_catalog.csv"       # אופציונלי: קטלוג מוסדות/תחומים
+
+# סדר עמודות רצוי (כולל תאריך)
+COLUMNS_ORDER = [
+    "תאריך",
+    "שם פרטי",
+    "שם משפחה",
+    "מוסד",
+    "תחום התמחות",
+    "רחוב",
+    "עיר",
+    "מיקוד",
+    "מספר סטודנטים שניתן לקלוט",
+    "מעוניין להמשיך",
+    "טלפון",
+    "אימייל",
+]
+
+def reorder_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """מציב את העמודות המוכרות לפי הסדר ומוסיף בסוף עמודות נוספות אם יש."""
+    known = [c for c in COLUMNS_ORDER if c in df.columns]
+    extra = [c for c in df.columns if c not in known]
+    return df[known + extra]
 
 # ===== עיצוב =====
 st.markdown("""
@@ -65,9 +87,8 @@ def load_csv_safely(path: Path) -> pd.DataFrame:
     return pd.DataFrame()
 
 def save_master_dataframe(df: pd.DataFrame) -> None:
-    """
-    שומר את המסד הראשי בצורה אטומית + יוצר גיבוי מתוארך.
-    """
+    """שומר את המסד הראשי בצורה אטומית + יוצר גיבוי מתוארך."""
+    df = reorder_columns(df.copy())
     temp_path = CSV_FILE.with_suffix(".tmp.csv")
     df.to_csv(temp_path, index=False, encoding="utf-8-sig")
     temp_path.replace(CSV_FILE)
@@ -77,6 +98,7 @@ def save_master_dataframe(df: pd.DataFrame) -> None:
 
 def append_to_log(row_df: pd.DataFrame) -> None:
     """Append-Only: לעולם לא מוחקים, רק מוסיפים שורה חדשה."""
+    row_df = reorder_columns(row_df.copy())
     file_exists = CSV_LOG_FILE.exists()
     row_df.to_csv(
         CSV_LOG_FILE,
@@ -88,6 +110,7 @@ def append_to_log(row_df: pd.DataFrame) -> None:
 
 def dataframe_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Sheet1") -> bytes:
     """ממיר DataFrame ל-XLSX בזיכרון (BytesIO)."""
+    df = reorder_columns(df.copy())
     bio = BytesIO()
     with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name)
@@ -102,7 +125,7 @@ def dataframe_to_excel_bytes(df: pd.DataFrame, sheet_name: str = "Sheet1") -> by
 def load_sites_catalog() -> pd.DataFrame:
     """
     מצפה לעמודות: 'שם מוסד' ו'תחום התמחות' (בקטלוג הפנימי),
-    ומשמש רק להשלמה אוטומטית. שימי לב: בעמודות ה*פלט* נייצא 'מוסד' ו'תחום התמחות'.
+    ומשמש רק להשלמה אוטומטית. בעמודות הפלט נשתמש 'מוסד' ו'תחום התמחות'.
     """
     if not SITES_FILE.exists():
         return pd.DataFrame()
@@ -169,7 +192,7 @@ if is_admin_mode:
 
         st.markdown("### הצגת הקובץ הראשי")
         if not df_master.empty:
-            st.dataframe(df_master, use_container_width=True)
+            st.dataframe(reorder_columns(df_master), use_container_width=True)
             st.download_button(
                 "📊 הורד Excel (ראשי)",
                 data=dataframe_to_excel_bytes(df_master, sheet_name="Master"),
@@ -183,7 +206,7 @@ if is_admin_mode:
         st.markdown("---")
         st.markdown("### הצגת קובץ היומן (Append-Only)")
         if not df_log.empty:
-            st.dataframe(df_log, use_container_width=True)
+            st.dataframe(reorder_columns(df_log), use_container_width=True)
             st.download_button(
                 "📊 הורד Excel (יומן)",
                 data=dataframe_to_excel_bytes(df_log, sheet_name="Log"),
@@ -198,7 +221,7 @@ if is_admin_mode:
             st.error("סיסמה שגויה")
     st.stop()
 
-# ===== טופס למילוי (שמות שדות = שמות עמודות) =====
+# ===== טופס למילוי =====
 st.title("📋 מיפוי מדריכים לשיבוץ סטודנטים - שנת הכשרה תשפ\"ו")
 st.write("""
 שלום רב, מטרת טופס זה היא לאסוף מידע עדכני על מדריכים ומוסדות הכשרה לקראת שיבוץ הסטודנטים לשנת ההכשרה הקרובה.  
@@ -207,12 +230,12 @@ st.write("""
 
 with st.form("mapping_form"):
     st.subheader("פרטים אישיים")
-    last_name = st.text_input("שם משפחה *", key="last_name")
+    # ← שם פרטי לפני שם משפחה
     first_name = st.text_input("שם פרטי *", key="first_name")
+    last_name  = st.text_input("שם משפחה *", key="last_name")
 
     st.subheader("מוסד והכשרה")
     if sites_available:
-        # שימי לב: בעמודת הפלט נשתמש בשם "מוסד"
         specialization = st.selectbox("תחום התמחות *", ["בחר מהרשימה"] + known_specs, key="specialization")
         filtered_institutions = (
             sorted(sites_df[sites_df['תחום התמחות'] == specialization]['שם מוסד'].unique().tolist())
@@ -233,11 +256,11 @@ with st.form("mapping_form"):
     st.subheader("קליטת סטודנטים")
     num_students = st.number_input("מספר סטודנטים שניתן לקלוט *", min_value=0, step=1, key="num_students")
 
-    # שם העמודה המדויק: "מעוניין להמשיך"
+    st.subheader("זמינות להמשך הדרכה")
     continue_mentoring = st.radio("מעוניין להמשיך *", ["כן", "לא"], key="continue_mentoring")
 
     st.subheader("פרטי התקשרות")
-    phone = st.text_input("טלפון *", key="phone")
+    phone = st.text_input("טלפון * (אפשר גם בלי מקף)", key="phone")
     email = st.text_input("אימייל *", key="email")
 
     submit_btn = st.form_submit_button("שלח/י", use_container_width=True)
@@ -246,10 +269,10 @@ with st.form("mapping_form"):
 if submit_btn:
     errors = []
 
-    if not last_name.strip():
-        errors.append("יש למלא 'שם משפחה'")
     if not first_name.strip():
         errors.append("יש למלא 'שם פרטי'")
+    if not last_name.strip():
+        errors.append("יש למלא 'שם משפחה'")
 
     # אימות מוסד/התמחות בהתאם לזמינות קטלוג
     if sites_available:
@@ -276,7 +299,7 @@ if submit_btn:
     if not postal_code.strip():
         errors.append("יש למלא 'מיקוד'")
 
-    # טלפון: תומך בפורמטים 0501234567 / 050-1234567 / 501234567 (כמו בדוגמה בקובץ)
+    # טלפון: תומך בפורמטים 0501234567 / 050-1234567 / 501234567
     phone_clean = phone.strip().replace("-", "").replace(" ", "")
     if not re.match(r"^(0?5\d{8})$", phone_clean):
         errors.append("מספר הטלפון אינו תקין (דוגמה: 0501234567)")
@@ -288,16 +311,16 @@ if submit_btn:
         for e in errors:
             st.error(e)
     else:
-        # קביעת ערכים סופיים לשדות בהתאם לשמות העמודות המדויקים
+        # ערכים סופיים
         final_spec = specialization if (sites_available and specialization in known_specs and specialization != "בחר מהרשימה") else \
                      (specialization_other.strip() if specialization == "אחר" else specialization)
         final_institution = institution_select if (sites_available and institution_select != "בחר מהרשימה") else institution_select.strip()
 
-        # בניית הרשומה לשמירה — מפתחות = שמות העמודות בקובץ mentors_sample.xlsx
+        # רשומה לשמירה (שמות עמודות תואמים mentors_sample.xlsx)
         record = {
             "תאריך": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "שם משפחה": last_name.strip(),
             "שם פרטי": first_name.strip(),
+            "שם משפחה": last_name.strip(),
             "מוסד": final_institution,
             "תחום התמחות": final_spec,
             "רחוב": street.strip(),
@@ -318,4 +341,4 @@ if submit_btn:
         # 2) רישום ליומן (Append-Only)
         append_to_log(new_row_df)
 
-        st.success("✅ הנתונים נשמרו בהצלחה! (שמות העמודות תואמים לקובץ הדוגמה)")
+        st.success("✅ הנתונים נשמרו בהצלחה! (שם פרטי לפני שם משפחה בכל המקומות)")
