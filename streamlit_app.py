@@ -1,9 +1,8 @@
 # streamlit_app.py
 # -*- coding: utf-8 -*-
 import re
-from io import BytesIO
-from pathlib import Path
 from datetime import datetime
+import pytz
 
 import streamlit as st
 import pandas as pd
@@ -86,8 +85,14 @@ input, textarea, select{ direction:rtl; text-align:right; }
 # ===== פונקציה לשמירה ב-Google Sheets =====
 def save_to_google_sheets(record: dict):
     try:
+        # אם הגיליון ריק – נכניס קודם את הכותרות
+        if not worksheet.get_all_values():
+            worksheet.append_row(COLUMNS_ORDER, value_input_option="USER_ENTERED")
+
+        # מוסיפים את הרשומה
         row_values = [record.get(col, "") for col in COLUMNS_ORDER]
         worksheet.append_row(row_values, value_input_option="USER_ENTERED")
+
     except Exception as e:
         st.error(f"שגיאה בשמירה ל-Google Sheets: {e}")
 
@@ -161,8 +166,11 @@ if submit_btn:
         for e in errors:
             st.error(e)
     else:
+        # שעון ישראל
+        tz_il = pytz.timezone("Asia/Jerusalem")
+
         record = {
-            "תאריך": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "תאריך": datetime.now(tz_il).strftime("%Y-%m-%d %H:%M:%S"),
             "שם פרטי": first_name.strip(),
             "שם משפחה": last_name.strip(),
             "סטטוס מדריך": mentor_status,
