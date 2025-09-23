@@ -85,11 +85,14 @@ input, textarea, select{ direction:rtl; text-align:right; }
 # ===== פונקציה לשמירה ב-Google Sheets =====
 def save_to_google_sheets(record: dict):
     try:
-        # אם הגיליון ריק – נכניס קודם את הכותרות
-        if not worksheet.get_all_values():
+        existing = worksheet.get_all_values()
+
+        # אם אין כותרות או שהן לא תואמות – נכניס אותן מחדש
+        if not existing or existing[0] != COLUMNS_ORDER:
+            worksheet.clear()
             worksheet.append_row(COLUMNS_ORDER, value_input_option="USER_ENTERED")
 
-        # מוסיפים את הרשומה
+        # מוסיפים את הרשומה בסוף
         row_values = [record.get(col, "") for col in COLUMNS_ORDER]
         worksheet.append_row(row_values, value_input_option="USER_ENTERED")
 
