@@ -130,6 +130,7 @@ def save_to_google_sheets(record: dict):
         # מוסיפים את הרשומה בסוף
         row_values = [record.get(col, "") for col in COLUMNS_ORDER]
         worksheet.append_row(row_values, value_input_option="USER_ENTERED")
+        style_google_sheet(worksheet)  
 
     except Exception as e:
         st.error(f"שגיאה בשמירה ל-Google Sheets: {e}")
