@@ -10,7 +10,12 @@ import pandas as pd
 # ===== Google Sheets =====
 import gspread
 from google.oauth2.service_account import Credentials
-
+from google.oauth2.service_account import Credentials
+from gspread_formatting import (
+    CellFormat, Color, TextFormat,
+    ConditionalFormatRule, BooleanRule, BooleanCondition,
+    GridRange, format_cell_range, get_conditional_format_rules
+)
 # ===== קונפיגורציה כללית =====
 st.set_page_config(page_title="מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו", layout="centered")
 
@@ -50,6 +55,36 @@ COLUMNS_ORDER = [
     "טלפון",
     "אימייל",
 ]
+def style_google_sheet(ws):
+    """Apply styling to the Google Sheet."""
+    
+    # --- עיצוב כותרות (שורה 1) ---
+    header_fmt = CellFormat(
+        backgroundColor=Color(0.4, 0.8, 0.6),   # ירוק בהיר
+        textFormat=TextFormat(bold=True, foregroundColor=Color(1, 1, 1)),  # טקסט לבן מודגש
+        horizontalAlignment='CENTER'
+    )
+    format_cell_range(ws, "1:1", header_fmt)
+
+    # --- צבעי רקע מתחלפים (פסי זברה) ---
+    rule = ConditionalFormatRule(
+        ranges=[GridRange.from_a1_range('A2:Z1000', ws)],
+        booleanRule=BooleanRule(
+            condition=BooleanCondition('CUSTOM_FORMULA', ['=ISEVEN(ROW())']),
+            format=CellFormat(backgroundColor=Color(0.95, 0.95, 0.95))  # אפור בהיר
+        )
+    )
+    rules = get_conditional_format_rules(ws)
+    rules.clear()
+    rules.append(rule)
+    rules.save()
+
+    # --- עיצוב עמודת ת"ז (C) ---
+    id_fmt = CellFormat(
+        horizontalAlignment='CENTER',
+        backgroundColor=Color(0.9, 0.9, 0.9)  # אפור עדין
+    )
+    format_cell_range(ws, "C2:C1000", id_fmt)
 
 # ===== עיצוב CSS =====
 st.markdown("""
@@ -114,7 +149,7 @@ with st.form("mapping_form"):
     mentor_status = st.selectbox(
         "סטטוס מדריך *",
         ["מדריך חדש (נדרש קורס)", "מדריך ממשיך"],
-        help="מדריך חדש יישלח לקורס הכשרה מתאים."
+        help=".מדריך חדש יישלח לקורס הכשרה מתאים"
     )
 
     st.subheader("מוסד")
@@ -133,7 +168,11 @@ with st.form("mapping_form"):
     continue_mentoring = st.radio("מעוניין להמשיך *", ["כן", "לא"])
 
     st.subheader("בקשות מיוחדות")
-    special_requests = st.text_area("בקשות מיוחדות")
+    special_requests = st.text_area(
+        "בקשות מיוחדות (למשל: הדרכה בערב, שפות, נגישות, אילוצים)",
+        placeholder="כתבו כאן כל בקשה שתרצו שניקח בחשבון בשיבוץ",
+        key="special_requests"
+    )
 
     st.subheader("פרטי התקשרות")
     phone = st.text_input("טלפון *")
@@ -191,4 +230,4 @@ if submit_btn:
 
         save_to_google_sheets(record)
 
-        st.success("✅ הנתונים נשמרו בהצלחה ב-Google Sheets!")
+        st.success("✅ הנתונים נשמרו בהצלחה !")
