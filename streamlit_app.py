@@ -10,12 +10,12 @@ import pandas as pd
 # ===== Google Sheets =====
 import gspread
 from google.oauth2.service_account import Credentials
-from google.oauth2.service_account import Credentials
 from gspread_formatting import (
     CellFormat, Color, TextFormat,
     ConditionalFormatRule, BooleanRule, BooleanCondition,
     GridRange, format_cell_range, get_conditional_format_rules
 )
+
 # ===== קונפיגורציה כללית =====
 st.set_page_config(page_title="מיפוי מדריכים לשיבוץ סטודנטים - תשפ\"ו", layout="centered")
 
@@ -33,7 +33,7 @@ worksheet = sh.sheet1
 
 # ===== רשימת תחומי התמחות =====
 SPECIALIZATIONS = ["רווחה","מוגבלות","זקנה","ילדים ונוער","בריאות הנפש",
-                   "שיקום","משפחה","נשים","בריאות","קהילה"]
+                   "שיקום","משפחה","נשים","בריאות","קהילה","אחר"]
 
 # ===== סדר עמודות =====
 COLUMNS_ORDER = [
@@ -49,9 +49,13 @@ COLUMNS_ORDER = [
     "מספר סטודנטים שניתן לקלוט (1 או 2)",
     "מעוניין להמשיך",
     "בקשות מיוחדות",
+    "חוות דעת - נקודות",
+    "חוות דעת - טקסט חופשי",
     "טלפון",
     "אימייל",
 ]
+
+# ===== עיצוב Google Sheets =====
 def style_google_sheet(ws):
     """Apply styling to the Google Sheet."""
     
@@ -75,13 +79,6 @@ def style_google_sheet(ws):
     rules.clear()
     rules.append(rule)
     rules.save()
-
-    # --- עיצוב עמודת ת"ז (C) ---
-    id_fmt = CellFormat(
-        horizontalAlignment='CENTER',
-        backgroundColor=Color(0.9, 0.9, 0.9)  # אפור עדין
-    )
-    format_cell_range(ws, "C2:C1000", id_fmt)
 
 # ===== עיצוב CSS =====
 st.markdown("""
@@ -150,7 +147,7 @@ with st.form("mapping_form"):
         help=".מדריך חדש יישלח לקורס הכשרה מתאים"
     )
 
-    st.subheader(" שם המוסד ")
+    st.subheader("שם המוסד ותחום התמחות")
     institute_select = st.text_input("מוסד *")
     spec_choice = st.selectbox("תחום התמחות *", ["בחר מהרשימה"] + SPECIALIZATIONS)
 
@@ -170,6 +167,16 @@ with st.form("mapping_form"):
         "בקשות מיוחדות (למשל: הדרכה בערב, שפות, נגישות, אילוצים)",
         placeholder="כתבו כאן כל בקשה שתרצו שניקח בחשבון בשיבוץ",
         key="special_requests"
+    )
+
+    st.subheader("חוות דעת על מדריך")
+    mentor_feedback_points = st.multiselect(
+        "בחר/י נקודות רלוונטיות",
+        ["סבלני", "מקצועי", "זמין", "קשוב", "מאפשר התנסות", "אחר"]
+    )
+    mentor_feedback_text = st.text_area(
+        "כתיבה חופשית (הרחבה/פירוט נוסף)",
+        placeholder="כתבו כאן חוות דעת חופשית..."
     )
 
     st.subheader("פרטי התקשרות")
@@ -222,10 +229,11 @@ if submit_btn:
             "מספר סטודנטים שניתן לקלוט (1 או 2)": int(num_students),
             "מעוניין להמשיך": continue_mentoring,
             "בקשות מיוחדות": special_requests.strip(),
+            "חוות דעת - נקודות": "; ".join(mentor_feedback_points),
+            "חוות דעת - טקסט חופשי": mentor_feedback_text.strip(),
             "טלפון": phone_clean,
             "אימייל": email.strip()
         }
 
         save_to_google_sheets(record)
-
         st.success("✅ הנתונים נשמרו בהצלחה !")
