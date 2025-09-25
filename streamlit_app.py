@@ -33,7 +33,7 @@ worksheet = sh.sheet1
 
 # ===== רשימת תחומי התמחות =====
 SPECIALIZATIONS = ["רווחה","מוגבלות","זקנה","ילדים ונוער","בריאות הנפש",
-                   "שיקום","משפחה","נשים","בריאות","קהילה","אחר"]
+                   "שיקום","משפחה","נשים","בריאות","קהילה"]
 
 # ===== סדר עמודות =====
 COLUMNS_ORDER = [
@@ -82,19 +82,6 @@ def style_google_sheet(ws):
         backgroundColor=Color(0.9, 0.9, 0.9)  # אפור עדין
     )
     format_cell_range(ws, "C2:C1000", id_fmt)
-    
-    rule = ConditionalFormatRule(
-        ranges=[GridRange.from_a1_range('A2:Z1000', ws)],
-        booleanRule=BooleanRule(
-            condition=BooleanCondition('CUSTOM_FORMULA', ['=ISEVEN(ROW())']),
-            format=CellFormat(backgroundColor=Color(0.95, 0.95, 0.95))
-        )
-    )
-    rules = get_conditional_format_rules(ws)
-    rules.clear()
-    rules.append(rule)
-    rules.save()
-
 
 # ===== עיצוב CSS =====
 st.markdown("""
@@ -127,15 +114,21 @@ input, textarea, select{ direction:rtl; text-align:right; }
 </style>
 """, unsafe_allow_html=True)
 
+# ===== פונקציה לשמירה ב-Google Sheets =====
 def save_to_google_sheets(record: dict):
     try:
         existing = worksheet.get_all_values()
+
+        # אם אין כותרות או שהן לא תואמות – נכניס אותן מחדש
         if not existing or existing[0] != COLUMNS_ORDER:
             worksheet.clear()
             worksheet.append_row(COLUMNS_ORDER, value_input_option="USER_ENTERED")
+
+        # מוסיפים את הרשומה בסוף
         row_values = [record.get(col, "") for col in COLUMNS_ORDER]
         worksheet.append_row(row_values, value_input_option="USER_ENTERED")
-        style_google_sheet(worksheet)
+        style_google_sheet(worksheet)  
+
     except Exception as e:
         st.error(f"שגיאה בשמירה ל-Google Sheets: {e}")
 
@@ -152,23 +145,14 @@ with st.form("mapping_form"):
     last_name  = st.text_input("שם משפחה *")
 
     mentor_status = st.selectbox(
-        "מדריך חדש/ממשיך *",
+        "סטטוס מדריך *",
         ["מדריך חדש (נדרש קורס)", "מדריך ממשיך"],
         help=".מדריך חדש יישלח לקורס הכשרה מתאים"
     )
 
-    st.subheader("מקום הכשרה")
-    institute_select = st.text_input("מקום הכשרה *")
-
-    st.subheader("תחומי התמחות")
-    specializations = st.multiselect(
-        "בחר/י עד 3 תחומים *",
-        SPECIALIZATIONS,
-        max_selections=3
-    )
-    specializations_other = ""
-    if "אחר" in specializations:
-        specializations_other = st.text_input("פרט/י תחום התמחות אחר *")
+    st.subheader("מוסד")
+    spec_choice = st.selectbox("תחום התמחות *", ["בחר מהרשימה"] + SPECIALIZATIONS)
+    institute_select = st.text_input("מוסד *")
 
     st.subheader("כתובת המוסד")
     street = st.text_input("רחוב *")
@@ -184,7 +168,8 @@ with st.form("mapping_form"):
     st.subheader("בקשות מיוחדות")
     special_requests = st.text_area(
         "בקשות מיוחדות (למשל: הדרכה בערב, שפות, נגישות, אילוצים)",
-        placeholder="כתבו כאן כל בקשה שתרצו שניקח בחשבון בשיבוץ"
+        placeholder="כתבו כאן כל בקשה שתרצו שניקח בחשבון בשיבוץ",
+        key="special_requests"
     )
 
     st.subheader("פרטי התקשרות")
@@ -200,12 +185,10 @@ if submit_btn:
         errors.append("יש למלא 'שם פרטי'")
     if not last_name.strip():
         errors.append("יש למלא 'שם משפחה'")
+    if spec_choice == "בחר מהרשימה":
+        errors.append("יש לבחור 'תחום התמחות'")
     if not institute_select.strip():
-        errors.append("יש למלא 'מקום הכשרה'")
-    if not specializations:
-        errors.append("יש לבחור לפחות תחום התמחות אחד")
-    if "אחר" in specializations and not specializations_other.strip():
-        errors.append("יש לפרט תחום התמחות אחר")
+        errors.append("יש למלא 'מוסד'")
     if not street.strip():
         errors.append("יש למלא 'רחוב'")
     if not city.strip():
@@ -223,18 +206,16 @@ if submit_btn:
         for e in errors:
             st.error(e)
     else:
+        # שעון ישראל
         tz_il = pytz.timezone("Asia/Jerusalem")
 
         record = {
             "תאריך": datetime.now(tz_il).strftime("%Y-%m-%d %H:%M:%S"),
             "שם פרטי": first_name.strip(),
             "שם משפחה": last_name.strip(),
-            "מדריך חדש/ממשיך": mentor_status,
-            "מקום הכשרה": institute_select.strip(),
-            "תחומי התמחות": "; ".join(
-                [s for s in specializations if s != "אחר"] +
-                ([specializations_other.strip()] if "אחר" in specializations else [])
-            ),
+            "סטטוס מדריך": mentor_status,
+            "מוסד": institute_select.strip(),
+            "תחום התמחות": spec_choice,
             "רחוב": street.strip(),
             "עיר": city.strip(),
             "מיקוד": postal_code.strip(),
@@ -246,4 +227,5 @@ if submit_btn:
         }
 
         save_to_google_sheets(record)
+
         st.success("✅ הנתונים נשמרו בהצלחה !")
