@@ -150,9 +150,9 @@ with st.form("mapping_form"):
         help=".מדריך חדש יישלח לקורס הכשרה מתאים"
     )
 
-    st.subheader("מוסד")
-    spec_choice = st.selectbox("תחום התמחות *", ["בחר מהרשימה"] + SPECIALIZATIONS)
+    st.subheader(" שם המוסד ")
     institute_select = st.text_input("מוסד *")
+    spec_choice = st.selectbox("תחום התמחות *", ["בחר מהרשימה"] + SPECIALIZATIONS)
 
     st.subheader("כתובת המוסד")
     street = st.text_input("רחוב *")
