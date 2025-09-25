@@ -33,7 +33,7 @@ worksheet = sh.sheet1
 
 # ===== רשימת תחומי התמחות =====
 SPECIALIZATIONS = ["רווחה","מוגבלות","זקנה","ילדים ונוער","בריאות הנפש",
-                   "שיקום","משפחה","נשים","בריאות","קהילה","אחר"]
+                   "שיקום","משפחה","נשים","בריאות","קהילה"]
 
 # ===== סדר עמודות =====
 COLUMNS_ORDER = [
@@ -55,24 +55,20 @@ COLUMNS_ORDER = [
     "אימייל",
 ]
 
-# ===== עיצוב Google Sheets =====
+# ===== פונקציית עיצוב =====
 def style_google_sheet(ws):
-    """Apply styling to the Google Sheet."""
-    
-    # --- עיצוב כותרות (שורה 1) ---
     header_fmt = CellFormat(
-        backgroundColor=Color(0.4, 0.8, 0.6),   # ירוק בהיר
-        textFormat=TextFormat(bold=True, foregroundColor=Color(1, 1, 1)),  # טקסט לבן מודגש
+        backgroundColor=Color(0.4, 0.8, 0.6),
+        textFormat=TextFormat(bold=True, foregroundColor=Color(1, 1, 1)),
         horizontalAlignment='CENTER'
     )
     format_cell_range(ws, "1:1", header_fmt)
 
-    # --- צבעי רקע מתחלפים (פסי זברה) ---
     rule = ConditionalFormatRule(
         ranges=[GridRange.from_a1_range('A2:Z1000', ws)],
         booleanRule=BooleanRule(
             condition=BooleanCondition('CUSTOM_FORMULA', ['=ISEVEN(ROW())']),
-            format=CellFormat(backgroundColor=Color(0.95, 0.95, 0.95))  # אפור בהיר
+            format=CellFormat(backgroundColor=Color(0.95, 0.95, 0.95))
         )
     )
     rules = get_conditional_format_rules(ws)
@@ -115,17 +111,13 @@ input, textarea, select{ direction:rtl; text-align:right; }
 def save_to_google_sheets(record: dict):
     try:
         existing = worksheet.get_all_values()
-
-        # אם אין כותרות או שהן לא תואמות – נכניס אותן מחדש
         if not existing or existing[0] != COLUMNS_ORDER:
             worksheet.clear()
             worksheet.append_row(COLUMNS_ORDER, value_input_option="USER_ENTERED")
 
-        # מוסיפים את הרשומה בסוף
         row_values = [record.get(col, "") for col in COLUMNS_ORDER]
         worksheet.append_row(row_values, value_input_option="USER_ENTERED")
-        style_google_sheet(worksheet)  
-
+        style_google_sheet(worksheet)
     except Exception as e:
         st.error(f"שגיאה בשמירה ל-Google Sheets: {e}")
 
@@ -147,7 +139,7 @@ with st.form("mapping_form"):
         help=".מדריך חדש יישלח לקורס הכשרה מתאים"
     )
 
-    st.subheader("שם המוסד ותחום התמחות")
+    st.subheader("שם המוסד")
     institute_select = st.text_input("מוסד *")
     spec_choice = st.selectbox("תחום התמחות *", ["בחר מהרשימה"] + SPECIALIZATIONS)
 
@@ -213,9 +205,7 @@ if submit_btn:
         for e in errors:
             st.error(e)
     else:
-        # שעון ישראל
         tz_il = pytz.timezone("Asia/Jerusalem")
-
         record = {
             "תאריך": datetime.now(tz_il).strftime("%Y-%m-%d %H:%M:%S"),
             "שם פרטי": first_name.strip(),
@@ -234,6 +224,5 @@ if submit_btn:
             "טלפון": phone_clean,
             "אימייל": email.strip()
         }
-
         save_to_google_sheets(record)
         st.success("✅ הנתונים נשמרו בהצלחה !")
