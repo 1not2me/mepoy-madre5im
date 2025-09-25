@@ -165,10 +165,12 @@ with st.form("mapping_form"):
         "סמן/י נקודות רלוונטיות",
         ["סבלני", "מקצועי", "זמין", "קשוב", "מאפשר התנסות", "אחר"]
     )
-    mentor_feedback_text = st.text_area(
-        "כתיבה חופשית (פירוט נוסף)",
-        placeholder="כתוב/י כאן חוות דעת חופשית..."
+    mentor_feedback_points = st.multiselect(
+        "סמן/י נקודות רלוונטיות",
+        ["סבלני", "מקצועי", "זמין", "קשוב", "מאפשר התנסות", "אחר"],
+        placeholder="בחר מהרשימה"
     )
+
 
     st.subheader("פרטי התקשרות")
     phone = st.text_input("מספר טלפון *")
