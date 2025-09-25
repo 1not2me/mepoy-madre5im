@@ -136,11 +136,11 @@ with st.form("mapping_form"):
     mentor_status = st.selectbox(
         "סטטוס מדריך *",
         ["מדריך חדש (נדרש קורס)", "מדריך ממשיך"],
-        help=".מדריך חדש יישלח לקורס הכשרה מתאים"
+        help="מדריך חדש יישלח לקורס הכשרה מתאים"
     )
 
-    st.subheader("שם המוסד")
-    institute_select = st.text_input("מוסד *")
+    st.subheader("מוסד ההכשרה")
+    institute_select = st.text_input("שם המוסד *")
     spec_choice = st.selectbox("תחום התמחות *", ["בחר מהרשימה"] + SPECIALIZATIONS)
 
     st.subheader("כתובת המוסד")
@@ -151,29 +151,28 @@ with st.form("mapping_form"):
     st.subheader("קליטת סטודנטים")
     num_students = st.selectbox("מספר סטודנטים שניתן לקלוט (1 או 2) *", [1, 2])
 
-    st.subheader("זמינות להמשך הדרכה")
-    continue_mentoring = st.radio("מעוניין להמשיך *", ["כן", "לא"])
+    st.subheader("המשכיות הדרכה")
+    continue_mentoring = st.radio("האם אתה מעוניין להמשיך להדריך? *", ["כן", "לא"])
 
     st.subheader("בקשות מיוחדות")
     special_requests = st.text_area(
         "בקשות מיוחדות (למשל: הדרכה בערב, שפות, נגישות, אילוצים)",
-        placeholder="כתבו כאן כל בקשה שתרצו שניקח בחשבון בשיבוץ",
-        key="special_requests"
+        placeholder="כתוב/י כאן כל בקשה שתרצה שניקח בחשבון בשיבוץ"
     )
 
-    st.subheader("חוות דעת על מדריך")
+    st.subheader("חוות דעת על המדריך")
     mentor_feedback_points = st.multiselect(
-        "בחר/י נקודות רלוונטיות",
+        "סמן/י נקודות רלוונטיות",
         ["סבלני", "מקצועי", "זמין", "קשוב", "מאפשר התנסות", "אחר"]
     )
     mentor_feedback_text = st.text_area(
-        "כתיבה חופשית (הרחבה/פירוט נוסף)",
-        placeholder="כתבו כאן חוות דעת חופשית..."
+        "כתיבה חופשית (פירוט נוסף)",
+        placeholder="כתוב/י כאן חוות דעת חופשית..."
     )
 
     st.subheader("פרטי התקשרות")
-    phone = st.text_input("טלפון *")
-    email = st.text_input("אימייל *")
+    phone = st.text_input("מספר טלפון *")
+    email = st.text_input("כתובת דוא\"ל *")
 
     submit_btn = st.form_submit_button("שלח/י", use_container_width=True)
 
@@ -181,25 +180,25 @@ with st.form("mapping_form"):
 if submit_btn:
     errors = []
     if not first_name.strip():
-        errors.append("יש למלא 'שם פרטי'")
+        errors.append("יש למלא שם פרטי")
     if not last_name.strip():
-        errors.append("יש למלא 'שם משפחה'")
+        errors.append("יש למלא שם משפחה")
     if spec_choice == "בחר מהרשימה":
-        errors.append("יש לבחור 'תחום התמחות'")
+        errors.append("יש לבחור תחום התמחות")
     if not institute_select.strip():
-        errors.append("יש למלא 'מוסד'")
+        errors.append("יש למלא שם מוסד")
     if not street.strip():
-        errors.append("יש למלא 'רחוב'")
+        errors.append("יש למלא רחוב")
     if not city.strip():
-        errors.append("יש למלא 'עיר'")
+        errors.append("יש למלא עיר")
     if not postal_code.strip():
-        errors.append("יש למלא 'מיקוד'")
+        errors.append("יש למלא מיקוד")
 
     phone_clean = phone.strip().replace("-", "").replace(" ", "")
     if not re.match(r"^(0?5\d{8})$", phone_clean):
         errors.append("מספר הטלפון אינו תקין (דוגמה: 0501234567)")
     if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email.strip()):
-        errors.append("כתובת האימייל אינה תקינה")
+        errors.append("כתובת הדוא\"ל אינה תקינה")
 
     if errors:
         for e in errors:
@@ -225,4 +224,4 @@ if submit_btn:
             "אימייל": email.strip()
         }
         save_to_google_sheets(record)
-        st.success("✅ הנתונים נשמרו בהצלחה !")
+        st.success("✅ הנתונים נשמרו בהצלחה!")
