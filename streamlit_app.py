@@ -82,6 +82,19 @@ def style_google_sheet(ws):
         backgroundColor=Color(0.9, 0.9, 0.9)  # אפור עדין
     )
     format_cell_range(ws, "C2:C1000", id_fmt)
+    
+    rule = ConditionalFormatRule(
+        ranges=[GridRange.from_a1_range('A2:Z1000', ws)],
+        booleanRule=BooleanRule(
+            condition=BooleanCondition('CUSTOM_FORMULA', ['=ISEVEN(ROW())']),
+            format=CellFormat(backgroundColor=Color(0.95, 0.95, 0.95))
+        )
+    )
+    rules = get_conditional_format_rules(ws)
+    rules.clear()
+    rules.append(rule)
+    rules.save()
+
 
 # ===== עיצוב CSS =====
 st.markdown("""
@@ -113,18 +126,6 @@ html, body, [class*="css"] { font-family: system-ui, "Segoe UI", Arial; }
 input, textarea, select{ direction:rtl; text-align:right; }
 </style>
 """, unsafe_allow_html=True)
-
-    rule = ConditionalFormatRule(
-        ranges=[GridRange.from_a1_range('A2:Z1000', ws)],
-        booleanRule=BooleanRule(
-            condition=BooleanCondition('CUSTOM_FORMULA', ['=ISEVEN(ROW())']),
-            format=CellFormat(backgroundColor=Color(0.95, 0.95, 0.95))
-        )
-    )
-    rules = get_conditional_format_rules(ws)
-    rules.clear()
-    rules.append(rule)
-    rules.save()
 
 def save_to_google_sheets(record: dict):
     try:
