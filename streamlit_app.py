@@ -141,7 +141,7 @@ with st.form("mapping_form"):
 
     st.subheader("מוסד ההכשרה")
     institute_select = st.text_input("שם המוסד *")
-    spec_choice = st.selectbox("תחום התמחות *", ["בחר מהרשימה"] + SPECIALIZATIONS)
+    spec_choice = st.selectbox("תחום התמחות *", ["בחר/י מהרשימה"] + SPECIALIZATIONS)
 
     st.subheader("כתובת המוסד")
     street = st.text_input("רחוב *")
@@ -162,13 +162,14 @@ with st.form("mapping_form"):
 
     st.subheader("חוות דעת על המדריך")
     mentor_feedback_points = st.multiselect(
-        "סמן/י נקודות רלוונטיות",
-        ["סבלני", "מקצועי", "זמין", "קשוב", "מאפשר התנסות", "אחר"]
-    )
-    mentor_feedback_points = st.multiselect(
-        "סמן/י נקודות רלוונטיות",
-        ["סבלני", "מקצועי", "זמין", "קשוב", "מאפשר התנסות", "אחר"],
-        placeholder="בחר מהרשימה"
+       "סמן/י נקודות רלוונטיות",
+       ["סבלני", "מקצועי", "זמין", "קשוב", "מאפשר התנסות", "אחר"],
+       placeholder="בחר/י מהרשימה"
+   )
+
+    mentor_feedback_text = st.text_area(
+        "כתיבה חופשית (פירוט נוסף)",
+        placeholder="כתוב/י כאן חוות דעת חופשית..."
     )
 
 
