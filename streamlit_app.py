@@ -249,7 +249,7 @@ if submit_btn:
     else:
         tz_il = pytz.timezone("Asia/Jerusalem")
         record = {
-            "תאריך": datetime.now(tz_il).strftime("%Y-%m-%d %H:%M:%S"),
+            "תאריך שליחה": datetime.now(tz_il).strftime("%Y-%m-%d %H:%M:%S"),
             "שם פרטי": first_name.strip(),
             "שם משפחה": last_name.strip(),
             "סטטוס מדריך": mentor_status,
