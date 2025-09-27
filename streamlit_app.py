@@ -267,4 +267,4 @@ if submit_btn:
             "אימייל": email.strip()
         }
         save_to_google_sheets(record)
-        st.success("✅ הנתונים נשמרו בהצלחה!")
+        st.success("✅ הטופס נשלח ונשמר בהצלחה! תודה רבה.")
